@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Orden de Compra</title>
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="apple-touch.png">
+<meta name="theme-color" content="#431407">
+<link rel="stylesheet" href="oc.css">
+<style>
+  .prov-card { border: 1px solid var(--border); border-left: 4px solid var(--sc); border-radius: 10px; padding: 14px 16px; background: var(--paper); margin-bottom: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 13px; }
+  @media (max-width: 640px) { .prov-card { grid-template-columns: 1fr 1fr; } }
+  .prov-card .k { font-size: 11px; color: var(--ink-soft); display: block; }
+  .prov-card .v { font-weight: 600; word-break: break-word; }
+  .prov-card .wide { grid-column: 1 / -1; }
+  .sub-box { border: 1px dashed var(--border); border-radius: 10px; padding: 16px 16px 4px; margin-bottom: 16px; background: var(--paper); }
+  .sub-box input, .sub-box select { background: var(--surface); }
+  .sub-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15.5px; text-transform: uppercase; letter-spacing: .02em; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ret-box { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-radius: 10px; padding: 12px 14px; background: color-mix(in srgb, var(--sc) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--border)); font-size: 13px; margin-bottom: 16px; }
+  .ret-box b { font-family: 'Roboto Mono', monospace; }
+  .req-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+
+  #items-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .item-row { border: 1px solid var(--border); border-radius: 10px; padding: 14px 14px 4px; background: var(--paper); }
+  .item-row input, .item-row select { background: var(--surface); font-size: 13.5px; padding: 9px 10px; }
+  .item-row label { font-size: 11.5px; margin-bottom: 4px; }
+  .item-row .field { margin-bottom: 10px; }
+  .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .item-num { font-family: 'Roboto Mono', monospace; font-weight: 600; font-size: 12.5px; }
+  .item-remove { font: inherit; font-size: 12px; font-weight: 600; color: var(--critical); background: transparent; border: none; cursor: pointer; padding: 4px 6px; }
+  .ig1 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+  .ig2 { display: grid; grid-template-columns: 90px 110px 1fr; gap: 10px; }
+  .ig3 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
+  @media (max-width: 640px) { .ig1, .ig3 { grid-template-columns: 1fr 1fr; } .ig2 { grid-template-columns: 1fr 1fr; } .ig2 .f-desc-wrap { grid-column: 1 / -1; } .ig1 > :first-child { grid-column: 1 / -1; } }
+  .line-sub { font-family: 'Roboto Mono', monospace; font-weight: 600; font-size: 15px; text-align: right; padding: 9px 0; }
+  #add-item-btn { font: inherit; font-weight: 600; font-size: 13.5px; color: var(--ink); background: color-mix(in srgb, var(--sc) 12%, var(--surface)); border: 1px dashed var(--sc); border-radius: 10px; padding: 12px; cursor: pointer; width: 100%; margin-top: 12px; }
+  details.contract { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-top: 14px; background: var(--paper); }
+  details.contract summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+  details.contract input { background: var(--surface); }
+
+  .drop { position: relative; border: 1.5px dashed var(--border); border-radius: 10px; background: var(--surface); padding: 12px 14px; cursor: pointer; display: flex; gap: 10px; align-items: center; min-height: 58px; }
+  .drop:hover, .drop.drag { border-color: var(--sc); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .drop .ico { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; font-family: 'Roboto Mono', monospace; font-size: 10.5px; font-weight: 600; color: #fff; background: var(--sc); }
+  .drop .txt { font-size: 12.5px; line-height: 1.35; min-width: 0; }
+  .drop .txt strong { display: block; font-size: 13px; }
+  .drop .txt span { color: var(--ink-soft); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drop.has-file { border-style: solid; border-color: color-mix(in srgb, var(--success) 55%, var(--border)); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 0; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 4px 3px 10px; }
+  .chip button { border: none; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 14px; padding: 2px 6px; }
+
+  .submit-row { margin-top: 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .submit-note { font-size: 12.5px; color: var(--ink-soft); }
+  .confirm .ok-pill { display: inline-flex; align-items: center; gap: 8px; background: var(--success-bg); color: var(--success); font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 999px; margin-bottom: 14px; }
+  .ticket-id { font-family: 'Roboto Mono', monospace; font-weight: 600; font-size: 26px; margin: 0 0 6px; }
+  .confirm p { color: var(--ink-soft); font-size: 14px; line-height: 1.55; margin: 0 0 16px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 18px; }
+  @media (max-width: 560px) { .steps { grid-template-columns: 1fr 1fr; } }
+  .step { border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: 12px; background: var(--paper); }
+  .step b { display: block; font-size: 12.5px; margin-bottom: 2px; }
+  .step { border-top: 3px solid var(--stc); }
+  .step:nth-child(1) { --stc: var(--c1); } .step:nth-child(2) { --stc: var(--c2); } .step:nth-child(3) { --stc: var(--c3); } .step:nth-child(4) { --stc: var(--c4); }
+  .step.on { background: color-mix(in srgb, var(--stc) 12%, var(--surface)); }
+  .pill-grid .pill:nth-child(1) { --pc: var(--c1); } .pill-grid .pill:nth-child(2) { --pc: var(--c2); } .pill-grid .pill:nth-child(3) { --pc: var(--c4); } .pill-grid .pill:nth-child(4) { --pc: var(--c3); }
+  .item-row { border-left: 4px solid var(--c4); }
+  .item-row:nth-child(4n+2) { border-left-color: var(--c2); } .item-row:nth-child(4n+3) { border-left-color: var(--c3); } .item-row:nth-child(4n+4) { border-left-color: var(--c1); }
+  .item-num { color: var(--c4); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand-stripe"></div>
+  <div class="topbar-inner">
+    <img class="brand-logo" src="logo-blanco.png" alt="Grupo Firme">
+    <h1>Orden de Compra</h1>
+    <p class="lede">Levanta tu orden de compra con el proveedor ya cotizado. Se envía a tu jefe inmediato para autorizarla y después a Compras para emitirla al proveedor.</p>
+    <p class="code-line">FO-GF-02 · Rev. 00 ENE/26</p>
+  </div>
+</div>
+
+<main>
+<form id="oc-form" novalidate>
+
+  <!-- 1. Datos generales -->
+  <div class="card">
+    <h2 class="section-title"><span class="section-num">1</span>Datos de la orden</h2>
+    <p class="section-hint">Si la compra viene de una requisición, escribe su folio y trae sus artículos.</p>
+    <div class="field">
+      <label for="f-req">Folio de requisición <span class="opt">(opcional)</span></label>
+      <div class="req-row">
+        <input type="text" id="f-req" placeholder="REQ-00012" class="mono" autocomplete="off">
+        <button type="button" class="btn ghost" id="req-btn">Traer artículos</button>
+      </div>
+      <p class="hint" id="req-hint"></p>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="f-solicitante">Quién solicita</label><input type="text" id="f-solicitante" autocomplete="name" required></div>
+      <div class="field"><label for="f-correo">Tu correo</label><input type="email" id="f-correo" autocomplete="email" placeholder="nombre.gfm@gmail.com" required></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="f-autoriza">Jefe inmediato (autoriza)</label><input type="text" id="f-autoriza" required></div>
+      <div class="field"><label for="f-correo-aut">Correo de quien autoriza</label><input type="email" id="f-correo-aut" required><p class="hint">Le llegará un correo para autorizar o rechazar.</p></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="f-empresa">Empresa que compra</label><select id="f-empresa" required></select></div>
+      <div class="field"><label for="f-cc">Centro de costos</label><select id="f-cc" required></select></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label for="f-fecha">Fecha de la orden</label><input type="date" id="f-fecha" required></div>
+      <div class="field"><label for="f-frente">Frente <span class="opt">(opcional)</span></label><input type="text" id="f-frente"></div>
+      <div class="field"><label for="f-estim">No. de estimación <span class="opt">(opcional)</span></label><input type="text" id="f-estim" placeholder="NA"></div>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label id="tipo-label">Tipo de orden</label>
+      <div class="pill-grid" role="radiogroup" aria-labelledby="tipo-label" id="tipo-group"></div>
+    </div>
+  </div>
+
+  <!-- 2. Proveedor -->
+  <div class="card">
+    <h2 class="section-title"><span class="section-num">2</span>Proveedor</h2>
+    <p class="section-hint">Búscalo por número, nombre o RFC. Si no aparece, dalo de alta aquí mismo.</p>
+    <div class="field" id="prov-search-wrap">
+      <label for="f-prov">Proveedor</label>
+      <input type="search" id="f-prov" list="dl-prov" placeholder="Cargando catálogo…" autocomplete="off">
+      <datalist id="dl-prov"></datalist>
+      <p class="hint" id="prov-hint"></p>
+    </div>
+    <div class="prov-card" id="prov-card" hidden></div>
+    <div style="margin:-4px 0 16px"><div class="seg" id="prov-mode"><button type="button" data-v="cat" aria-pressed="true">Del catálogo</button><button type="button" data-v="nuevo" aria-pressed="false">Proveedor nuevo</button></div></div>
+
+    <div class="sub-box" id="nuevo-box" hidden>
+      <p class="sub-title">Alta de proveedor <span class="badge warn">Compras lo valida</span></p>
+      <div class="row2">
+        <div class="field"><label for="n-nombre">Nombre o razón social</label><input type="text" id="n-nombre"></div>
+        <div class="field"><label for="n-rfc">RFC</label><input type="text" id="n-rfc" class="mono" maxlength="13"><p class="hint" id="n-rfc-hint"></p></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="n-regimen">Régimen fiscal</label><select id="n-regimen"></select></div>
+        <div class="field"><label for="n-tel">Teléfono <span class="opt">(opcional)</span></label><input type="text" id="n-tel" inputmode="tel"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="n-clabe">CLABE interbancaria</label><input type="text" id="n-clabe" class="mono" inputmode="numeric" maxlength="18"><p class="hint" id="n-clabe-hint"></p></div>
+        <div class="field"><label for="n-banco">Banco</label><input type="text" id="n-banco" placeholder="Se detecta con la CLABE"></div>
+      </div>
+      <div class="row2">
+        <label class="drop field" id="drop-caratula"><input type="file" accept="application/pdf,image/*" data-tipo="CARATULA"><span class="ico">PDF</span><span class="txt"><strong>Carátula bancaria</strong><span>Toca o arrastra</span></span></label>
+        <label class="drop field" id="drop-csf"><input type="file" accept="application/pdf,image/*" data-tipo="CSF"><span class="ico">PDF</span><span class="txt"><strong>Constancia de situación fiscal</strong><span>Toca o arrastra</span></span></label>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="field"><label for="f-prov-correo">Correo del proveedor <span class="opt">(para enviarle la orden)</span></label><input type="email" id="f-prov-correo" placeholder="ventas@proveedor.com"></div>
+      <div class="field"><label for="f-servicio">Tipo de servicio</label><select id="f-servicio"></select></div>
+    </div>
+    <div class="field">
+      <label>¿El proveedor emite factura?</label>
+      <div class="seg" id="emite-seg"><button type="button" data-v="SI" aria-pressed="true">Sí, factura</button><button type="button" data-v="NO" aria-pressed="false">No factura</button></div>
+    </div>
+    <div class="ret-box" id="ret-box"><span id="ret-motivo">Selecciona un proveedor para calcular retenciones.</span><span>ISR <b id="ret-isr">0 %</b> · IVA <b id="ret-iva">0 %</b></span></div>
+  </div>
+
+  <!-- 3. Condiciones -->
+  <div class="card">
+    <h2 class="section-title"><span class="section-num">3</span>Condiciones de pago</h2>
+    <p class="section-hint">Lo que acordaste con el proveedor.</p>
+    <div class="row3">
+      <div class="field"><label for="f-forma">Forma de pago</label><select id="f-forma"></select></div>
+      <div class="field"><label for="f-metodo">Método de pago</label><select id="f-metodo"></select></div>
+      <div class="field"><label for="f-uso">Uso del CFDI</label><select id="f-uso"></select></div>
+    </div>
+    <div class="row4">
+      <div class="field"><label for="f-dias">Días de crédito</label><select id="f-dias"></select></div>
+      <div class="field"><label for="f-fpago">Pago aproximado</label><input type="text" id="f-fpago" readonly tabindex="-1" class="mono"></div>
+      <div class="field"><label for="f-moneda">Moneda</label><select id="f-moneda"><option>PESOS</option><option>DOLARES</option></select></div>
+      <div class="field"><label for="f-tc">Tipo de cambio</label><input type="text" id="f-tc" class="money" value="1.00" inputmode="decimal" disabled></div>
+    </div>
+    <p class="hint warn" id="metodo-hint" hidden>Con crédito el método suele ser PPD (pago diferido). Confírmalo con el proveedor.</p>
+  </div>
+
+  <!-- 4. Partidas -->
+  <div class="card">
+    <h2 class="section-title"><span class="section-num">4</span>Partidas</h2>
+    <p class="section-hint">Precio unitario antes de IVA. El IVA se calcula por partida.</p>
+    <div id="items-wrap"></div>
+    <button type="button" id="add-item-btn">+ Agregar partida</button>
+    <details class="contract" id="contract">
+      <summary>Retenciones contractuales (anticipo, fondo de garantía) <span class="opt" style="font-weight:400;color:var(--ink-soft)">— solo contratos de obra</span></summary>
+      <div class="row3" style="margin-top:12px">
+        <div class="field"><label for="p-anticipo">Amortización de anticipo %</label><input type="text" id="p-anticipo" class="money" inputmode="decimal" placeholder="0"></div>
+        <div class="field"><label for="p-fondo">Fondo de garantía %</label><input type="text" id="p-fondo" class="money" inputmode="decimal" placeholder="0"></div>
+        <div class="field"><label for="p-otras">Otras retenciones %</label><input type="text" id="p-otras" class="money" inputmode="decimal" placeholder="0"></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- 5. Resumen -->
+  <div class="card">
+    <h2 class="section-title"><span class="section-num">5</span>Resumen y envío</h2>
+    <div class="totals">
+      <div>
+        <div class="field"><label for="f-obs">Observaciones <span class="opt">(opcional)</span></label><textarea id="f-obs" placeholder="Condiciones de entrega, lugar, vigencia de la cotización…"></textarea></div>
+        <label class="drop" id="drop-cot"><input type="file" accept="application/pdf,image/*" multiple data-tipo="COTIZACION"><span class="ico">PDF</span><span class="txt"><strong>Cotización(es) del proveedor</strong><span>Opcional · PDF o foto</span></span></label>
+        <div class="chips" id="cot-chips"></div>
+      </div>
+      <div>
+        <div class="tot-box" id="tot-box"></div>
+        <p class="letra">Importe con letra: <b id="t-letra">Cero Pesos 00/100 M.N.</b></p>
+      </div>
+    </div>
+    <p class="error-msg" id="error-msg"></p>
+    <div class="submit-row">
+      <button type="submit" class="primary" id="submit-btn">Enviar a autorización</button>
+      <span class="submit-note">Recibirás un correo con tu folio.</span>
+    </div>
+  </div>
+</form>
+
+<div class="card confirm c2" id="confirm-view" hidden>
+  <span class="ok-pill">Orden registrada</span>
+  <p class="ticket-id" id="confirm-id">OC-00000</p>
+  <p id="confirm-text"></p>
+  <div class="steps">
+    <div class="step on"><b>1. Registrada</b>Ya tiene folio.</div>
+    <div class="step"><b>2. Autorización</b>Tu jefe inmediato la revisa.</div>
+    <div class="step"><b>3. Envío</b>Compras la manda al proveedor.</div>
+    <div class="step"><b>4. Pago</b>Finanzas paga al vencimiento.</div>
+  </div>
+  <button type="button" class="btn" id="dl-pdf">⬇ Descargar orden FO-GF-02 (PDF)</button>
+  <p class="hint" id="pdf-status"></p>
+  <p style="margin-top:18px"><a href="#" id="reset-link">Levantar otra orden</a></p>
+</div>
+</main>
+
+<div class="overlay" id="overlay" hidden><div class="box"><div class="spinner"></div><p id="overlay-text" style="margin:0">Enviando orden…</p><small style="color:var(--ink-soft)">No cierres esta página.</small></div></div>
+<footer>Grupo Firme · Departamento de TI</footer>
+
+<script src="oc-core.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ====== CONFIGURACIÓN ======
+  var APPS_SCRIPT_URL = '';  // URL /exec del backend "Ordenes de Compra GFM"
+  var REQ_URL = 'https://script.google.com/macros/s/AKfycbzP6eJ7PI653CMcyfAkbgsCxY9qLWWD6kPQrLixoMwPEW8QZKr2ozyAm0ZAsmQ_tNPO/exec'; // backend de Requisiciones
+  var MAX_ITEMS = 60, MAX_FILE = 8 * 1024 * 1024, IMG_MAX = 1800;
+
+  var O = window.OC, CAT = O.CAT, num = O.num, r2 = O.r2, esc = O.esc;
+  function $(id) { return document.getElementById(id); }
+  function opts(sel, list, ph, map) {
+    sel.innerHTML = (ph ? '<option value="" disabled selected>' + esc(ph) + '</option>' : '') + list.map(function (v) { var o = map ? map(v) : { v: v, l: v }; return '<option value="' + esc(o.v) + '">' + esc(o.l) + '</option>'; }).join('');
+  }
+  var state = { prov: null, provMode: 'cat', emite: 'SI', proveedores: [], items: [], files: { CARATULA: null, CSF: null, COTIZACION: [] }, last: null };
+
+  // ---- catálogos ----
+  opts($('f-empresa'), O.EMPRESAS.map(function (e) { return e.nombre; }), 'Selecciona la empresa');
+  opts($('f-cc'), CAT.cc, 'Selecciona el centro de costos');
+  opts($('f-servicio'), CAT.servicios);
+  opts($('f-forma'), CAT.formasPago);
+  opts($('f-metodo'), CAT.metodosPago);
+  opts($('f-uso'), CAT.usosCfdi); $('f-uso').value = 'G03 - Gastos en general';
+  opts($('f-dias'), CAT.diasCredito, null, function (d) { return { v: d, l: d ? d + ' días' : 'Contado' }; }); $('f-dias').value = '30';
+  opts($('n-regimen'), CAT.regimenes, 'Selecciona');
+  $('tipo-group').innerHTML = CAT.tiposOC.map(function (t, i) { return '<label class="pill"><input type="radio" name="tipo" value="' + t + '"' + (i ? '' : ' checked') + '><span class="dot"></span>' + t.charAt(0) + t.slice(1).toLowerCase() + '</label>'; }).join('');
+  $('f-fecha').value = O.todayISO();
+  if (O.EMPRESAS.length) $('f-empresa').value = O.EMPRESAS[0].nombre;
+  try { var me = JSON.parse(localStorage.getItem('gfm_oc_me') || '{}'); ['solicitante', 'correo', 'autoriza', 'correo-aut'].forEach(function (k) { if (me[k]) $('f-' + k).value = me[k]; }); } catch (e) {}
+
+  // ---- proveedores ----
+  function provLabel(p) { return p.num + ' · ' + p.nombre + (p.rfc ? ' · ' + p.rfc : ''); }
+  function loadProveedores() {
+    if (!APPS_SCRIPT_URL) { $('f-prov').placeholder = 'Catálogo no disponible: usa "Proveedor nuevo"'; return; }
+    fetch(APPS_SCRIPT_URL + '?action=proveedores').then(function (r) { return r.json(); }).then(function (d) {
+      state.proveedores = (d.items || []).sort(function (a, b) { return a.nombre.localeCompare(b.nombre); });
+      var frag = document.createDocumentFragment();
+      state.proveedores.forEach(function (p) { var o = document.createElement('option'); o.value = provLabel(p); frag.appendChild(o); });
+      $('dl-prov').appendChild(frag);
+      $('f-prov').placeholder = 'Ej. 997, DINAMICA TREVE o DTR1211276Z6';
+    }).catch(function () { $('f-prov').placeholder = 'No se pudo cargar el catálogo'; });
+  }
+  function findProv(q) {
+    q = String(q || '').trim(); if (!q) return null;
+    var m = q.match(/^(\d+)(\s*·|$)/);
+    if (m) return state.proveedores.filter(function (p) { return String(p.num) === m[1]; })[0] || null;
+    var u = q.toUpperCase();
+    var hits = state.proveedores.filter(function (p) { return p.rfc === u || p.nombre === u; });
+    return hits.length === 1 ? hits[0] : null;
+  }
+  function renderProvCard() {
+    var p = state.prov, c = $('prov-card');
+    if (!p || state.provMode !== 'cat') { c.hidden = true; return; }
+    c.hidden = false;
+    c.innerHTML = [['No. proveedor', '#' + p.num], ['RFC', p.rfc || '—'], ['Régimen', p.regimen || '—'], ['Banco', p.banco || '—'], ['CLABE / cuenta', p.clabe4 ? '•••• ' + p.clabe4 : '—'], ['Persona', O.esPersonaFisica(p.rfc) ? 'Física' : (p.rfc ? 'Moral' : '—')]]
+      .map(function (x) { return '<div><span class="k">' + x[0] + '</span><span class="v">' + esc(x[1]) + '</span></div>'; }).join('') +
+      (!p.clabe4 ? '<div class="wide hint warn">Sin cuenta bancaria registrada: Compras deberá completarla antes del pago.</div>' : '');
+  }
+  $('f-prov').addEventListener('change', function () { pickProv(); });
+  $('f-prov').addEventListener('input', function () { if (/^\d+ · /.test(this.value)) pickProv(); });
+  function pickProv() {
+    var p = findProv($('f-prov').value);
+    state.prov = p;
+    $('prov-hint').textContent = $('f-prov').value && !p ? 'Elige una opción de la lista o da de alta un proveedor nuevo.' : '';
+    $('prov-hint').className = 'hint' + ($('f-prov').value && !p ? ' bad' : '');
+    $('f-prov').classList.remove('invalid');
+    renderProvCard(); updRet();
+  }
+  Array.prototype.forEach.call($('prov-mode').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () {
+      state.provMode = b.dataset.v;
+      Array.prototype.forEach.call($('prov-mode').querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      $('nuevo-box').hidden = state.provMode !== 'nuevo';
+      $('prov-search-wrap').hidden = state.provMode === 'nuevo';
+      renderProvCard(); updRet();
+    });
+  });
+  Array.prototype.forEach.call($('emite-seg').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () {
+      state.emite = b.dataset.v;
+      Array.prototype.forEach.call($('emite-seg').querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      recalc(); updRet();
+    });
+  });
+  $('n-rfc').addEventListener('input', function () {
+    this.value = this.value.toUpperCase().replace(/[^A-ZÑ&0-9]/g, '');
+    var ok = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(this.value);
+    $('n-rfc-hint').textContent = this.value ? (ok ? (this.value.length === 13 ? 'Persona física' : 'Persona moral') : 'RFC incompleto o con formato inválido') : '';
+    $('n-rfc-hint').className = 'hint ' + (this.value ? (ok ? 'ok' : 'bad') : '');
+    updRet();
+  });
+  $('n-regimen').addEventListener('change', updRet);
+  $('f-servicio').addEventListener('change', updRet);
+
+  var BANCOS = { '002': 'BANAMEX', '012': 'BBVA BANCOMER', '014': 'SANTANDER', '021': 'HSBC', '030': 'BAJIO', '036': 'INBURSA', '042': 'MIFEL', '044': 'SCOTIABANK', '058': 'BANREGIO', '059': 'INVEX', '062': 'AFIRME', '072': 'BANORTE', '106': 'BANK OF AMERICA', '127': 'AZTECA', '128': 'AUTOFIN', '130': 'COMPARTAMOS', '137': 'BANCOPPEL', '138': 'ABC CAPITAL', '140': 'CONSUBANCO', '143': 'CIBANCO', '145': 'BBASE', '147': 'BANKAOOL', '156': 'SABADELL', '166': 'BANSEFI', '638': 'NU MEXICO', '646': 'STP', '722': 'MERCADO PAGO' };
+  function clabeValid(c) { if (!/^\d{18}$/.test(c)) return false; var w = [3, 7, 1], s = 0; for (var i = 0; i < 17; i++) s += (+c[i] * w[i % 3]) % 10; return (10 - s % 10) % 10 === +c[17]; }
+  $('n-clabe').addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 18);
+    var v = this.value, h = $('n-clabe-hint');
+    if (!v) { h.textContent = ''; h.className = 'hint'; return; }
+    if (v.length < 18) { h.textContent = v.length + ' de 18 dígitos'; h.className = 'hint'; return; }
+    var ok = clabeValid(v); h.textContent = ok ? 'CLABE válida' : 'El dígito verificador no coincide'; h.className = 'hint ' + (ok ? 'ok' : 'bad');
+    if (ok && BANCOS[v.slice(0, 3)] && !$('n-banco').value) $('n-banco').value = BANCOS[v.slice(0, 3)];
+  });
+
+  function provData() {
+    if (state.provMode === 'nuevo') return { num: '', nombre: $('n-nombre').value.trim().toUpperCase(), rfc: $('n-rfc').value.trim(), regimen: $('n-regimen').value || '', banco: $('n-banco').value.trim().toUpperCase(), clabe4: $('n-clabe').value.slice(-4) };
+    return state.prov;
+  }
+  var ret = { isr: 0, iva: 0 };
+  function updRet() {
+    var p = provData();
+    if (state.emite === 'NO') { ret = { isr: 0, iva: 0 }; $('ret-motivo').textContent = 'Sin factura: no se calcula IVA ni retenciones.'; }
+    else if (!p || (!p.regimen && !p.rfc)) { ret = { isr: 0, iva: 0 }; $('ret-motivo').textContent = 'Selecciona un proveedor para calcular retenciones.'; }
+    else { var s = O.retencionesSugeridas(p.regimen, p.rfc, $('f-servicio').value); ret = s; $('ret-motivo').textContent = s.motivo + '.'; }
+    $('ret-isr').textContent = O.pct(ret.isr); $('ret-iva').textContent = O.pct(ret.iva);
+    recalc();
+  }
+
+  // ---- condiciones ----
+  function updPago() {
+    var d = +$('f-dias').value, f = $('f-fecha').value;
+    $('f-fpago').value = f ? O.fmtDate(O.addDays(f, d)) : '';
+    $('metodo-hint').hidden = !(d > 0 && /^PUE/.test($('f-metodo').value));
+  }
+  ['f-dias', 'f-fecha', 'f-metodo'].forEach(function (id) { $(id).addEventListener('change', updPago); });
+  $('f-moneda').addEventListener('change', function () { var usd = this.value === 'DOLARES'; $('f-tc').disabled = !usd; if (!usd) $('f-tc').value = '1.00'; recalc(); });
+  $('f-tc').addEventListener('input', recalc);
+  ['p-anticipo', 'p-fondo', 'p-otras'].forEach(function (id) { $(id).addEventListener('input', recalc); });
+  updPago();
+
+  // ---- partidas ----
+  function addItem(pre) {
+    if (state.items.length >= MAX_ITEMS) return;
+    pre = pre || {};
+    var row = document.createElement('div'); row.className = 'item-row';
+    var obraDef = pre.obra || ($('f-cc').value && CAT.obras.indexOf($('f-cc').value) >= 0 ? $('f-cc').value : '');
+    row.innerHTML =
+      '<div class="item-head"><span class="item-num"></span><button type="button" class="item-remove">Quitar</button></div>' +
+      '<div class="ig1"><div class="field"><label>Obra</label><select class="i-obra">' + '<option value="">Misma del centro de costos</option>' + CAT.obras.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>Insumo</label><select class="i-partida"><option value="" disabled selected>Selecciona</option>' + CAT.partidas.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="ig2"><div class="field"><label>Cantidad</label><input type="text" class="i-cant money" inputmode="decimal"></div>' +
+      '<div class="field"><label>Unidad</label><select class="i-unidad">' + CAT.unidades.map(function (u) { return '<option>' + u + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field f-desc-wrap"><label>Descripción</label><input type="text" class="i-desc" placeholder="Ej. Concreto f\'c=350 kg/cm² TMA 20 mm"></div></div>' +
+      '<div class="ig3"><div class="field"><label>Precio unitario (sin IVA)</label><input type="text" class="i-pu money" inputmode="decimal" placeholder="0.00"></div>' +
+      '<div class="field"><label>IVA</label><select class="i-iva">' + CAT.tasasIva.map(function (t) { return '<option value="' + t.v + '">' + t.l + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>Subtotal</label><div class="line-sub i-sub">$0.00</div></div><div></div></div>';
+    var q = function (c) { return row.querySelector(c); };
+    var it = { row: row, q: q };
+    if (obraDef) q('.i-obra').value = obraDef;
+    if (pre.cantidad) q('.i-cant').value = pre.cantidad;
+    if (pre.unidad) { var u = String(pre.unidad).toUpperCase(); if (CAT.unidades.indexOf(u) < 0) { var o = document.createElement('option'); o.textContent = u; q('.i-unidad').appendChild(o); } q('.i-unidad').value = u; }
+    if (pre.descripcion) q('.i-desc').value = pre.descripcion;
+    if (pre.partida) q('.i-partida').value = pre.partida;
+    if (pre.precioUnitario) q('.i-pu').value = r2(num(pre.precioUnitario)).toFixed(2);
+    row.querySelectorAll('input,select').forEach(function (x) { x.addEventListener('input', recalc); x.addEventListener('change', recalc); });
+    q('.i-pu').addEventListener('blur', function () { if (this.value.trim()) this.value = r2(num(this.value)).toFixed(2); });
+    q('.item-remove').addEventListener('click', function () { if (state.items.length === 1) return; row.remove(); state.items = state.items.filter(function (x) { return x !== it; }); renumber(); recalc(); });
+    $('items-wrap').appendChild(row); state.items.push(it); renumber(); recalc();
+    return it;
+  }
+  function renumber() { state.items.forEach(function (it, i) { it.q('.item-num').textContent = 'Partida ' + (i + 1); it.q('.item-remove').hidden = state.items.length === 1; }); $('add-item-btn').hidden = state.items.length >= MAX_ITEMS; }
+  $('add-item-btn').addEventListener('click', function () { var it = addItem(); it.q('.i-desc').focus(); });
+  $('f-cc').addEventListener('change', function () { recalc(); });
+
+  function itemsData() {
+    return state.items.map(function (it) {
+      var q = it.q;
+      return { obra: q('.i-obra').value || $('f-cc').value, cantidad: r2(num(q('.i-cant').value)), unidad: q('.i-unidad').value, descripcion: q('.i-desc').value.trim(), partida: q('.i-partida').value || '', precioUnitario: num(q('.i-pu').value), tasaIva: q('.i-iva').value };
+    });
+  }
+  function ocData() {
+    var p = provData() || {};
+    var tipo = document.querySelector('input[name="tipo"]:checked');
+    return {
+      fecha: $('f-fecha').value, solicitante: $('f-solicitante').value.trim(), correoSolicitante: $('f-correo').value.trim().toLowerCase(),
+      autoriza: $('f-autoriza').value.trim(), correoAutoriza: $('f-correo-aut').value.trim().toLowerCase(),
+      empresa: $('f-empresa').value, cc: $('f-cc').value, frente: $('f-frente').value.trim(), estimacion: $('f-estim').value.trim() || 'NA',
+      tipoOC: tipo ? tipo.value : 'NORMAL', reqFolio: normReq($('f-req').value),
+      provNuevo: state.provMode === 'nuevo' ? 'SI' : 'NO', provNum: p.num || '', provNombre: p.nombre || '', provRfc: p.rfc || '', provRegimen: p.regimen || '', provBanco: p.banco || '',
+      provClabe: state.provMode === 'nuevo' ? $('n-clabe').value : (p.clabe4 ? '00000000000000' + p.clabe4 : ''), provTelefono: $('n-tel').value.trim(), provCorreo: $('f-prov-correo').value.trim().toLowerCase(),
+      servicio: $('f-servicio').value, emiteFactura: state.emite, formaPago: $('f-forma').value, metodoPago: $('f-metodo').value, usoCfdi: $('f-uso').value,
+      diasCredito: +$('f-dias').value, fechaPagoEstimada: $('f-fecha').value ? O.addDays($('f-fecha').value, +$('f-dias').value) : '',
+      moneda: $('f-moneda').value, tipoCambio: num($('f-tc').value) || 1,
+      pctAnticipo: num($('p-anticipo').value) / 100, pctFondo: num($('p-fondo').value) / 100, pctOtras: num($('p-otras').value) / 100,
+      retIsrPct: ret.isr, retIvaPct: ret.iva, items: itemsData(), observaciones: $('f-obs').value.trim()
+    };
+  }
+  function recalc() {
+    if (!state.items.length) return;
+    var oc = ocData(), t = O.calcular(oc), mon = oc.moneda;
+    state.items.forEach(function (it, i) { it.q('.i-sub').textContent = O.money(oc.items[i].subtotal, mon); });
+    var L = [['Importe', t.bruto]];
+    if (t.amort) L.push(['Amort. anticipo', -t.amort]); if (t.fondo) L.push(['Fondo de garantía', -t.fondo]); if (t.otras) L.push(['Otras retenciones', -t.otras]);
+    L.push(['Subtotal', t.subtotal], ['IVA', t.iva]);
+    if (t.retIsr) L.push(['Ret. ISR ' + O.pct(oc.retIsrPct), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.pct(oc.retIvaPct), -t.retIva]);
+    var html = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + O.money(Math.abs(x[1]), mon) + '</span></div>'; }).join('');
+    html += '<div class="tot-line grand"><span>Total</span><span>' + O.money(t.total, mon) + '</span></div>';
+    if (mon === 'DOLARES') html += '<div class="tot-line"><span>Equivalente M.N.</span><span>' + O.money(t.totalMXN) + '</span></div>';
+    $('tot-box').innerHTML = html;
+    $('t-letra').textContent = O.letras(t.total, mon);
+  }
+
+  // ---- requisición ----
+  function normReq(v) { v = String(v || '').trim().toUpperCase(); if (!v) return ''; var m = v.match(/(\d+)\s*$/); return /^REQ-\d{6}-/.test(v) ? v : (m ? 'REQ-' + ('0000' + +m[1]).slice(-5) : v); }
+  $('req-btn').addEventListener('click', function () {
+    var id = normReq($('f-req').value), h = $('req-hint');
+    if (!id) { h.textContent = 'Escribe el folio, por ejemplo REQ-00012.'; h.className = 'hint bad'; return; }
+    $('f-req').value = id; h.textContent = 'Buscando ' + id + '…'; h.className = 'hint';
+    fetch(REQ_URL + '?action=list').then(function (r) { return r.json(); }).then(function (d) {
+      var list = Array.isArray(d) ? d : (d.items || []);
+      var r = list.filter(function (x) { return String(x.id).toUpperCase() === id; })[0];
+      if (!r) { h.textContent = 'No encontré ' + id + ' en Requisiciones. Puedes continuar capturando a mano.'; h.className = 'hint bad'; return; }
+      if (r.empresa && O.EMPRESAS.some(function (e) { return e.nombre === r.empresa; })) $('f-empresa').value = r.empresa;
+      if (r.cc && CAT.cc.indexOf(r.cc) >= 0) $('f-cc').value = r.cc;
+      if (!$('f-solicitante').value && r.solicitante) $('f-solicitante').value = r.solicitante;
+      var arts = r.items || [];
+      if (arts.length) {
+        var empty = state.items.length === 1 && !state.items[0].q('.i-desc').value && !state.items[0].q('.i-pu').value;
+        if (empty) { state.items[0].row.remove(); state.items = []; }
+        arts.forEach(function (a) { addItem({ cantidad: a.cantidad, unidad: a.unidad, descripcion: a.descripcion, obra: r.obra && CAT.obras.indexOf(r.obra) >= 0 ? r.obra : '' }); });
+      }
+      var est = String(r.estado || '');
+      h.textContent = 'Se trajeron ' + arts.length + ' artículo(s) de ' + id + '. Falta capturar precio e insumo.' + (est && est !== 'autorizada' ? ' Ojo: la requisición está "' + est + '", no autorizada.' : '');
+      h.className = 'hint ' + (est && est !== 'autorizada' ? 'warn' : 'ok');
+    }).catch(function () { h.textContent = 'No se pudo consultar Requisiciones. Captura las partidas a mano.'; h.className = 'hint bad'; });
+  });
+
+  // ---- archivos ----
+  function readAsDataURL(f) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(f); }); }
+  function compress(f) {
+    return readAsDataURL(f).then(function (url) { return new Promise(function (res) { var img = new Image(); img.onload = function () { var s = Math.min(1, IMG_MAX / Math.max(img.width, img.height)); var c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.78)); }; img.onerror = function () { res(url); }; img.src = url; }); });
+  }
+  function prepFile(f, tipo) {
+    if (!f) return null;
+    var pdf = /pdf/i.test(f.type) || /\.pdf$/i.test(f.name);
+    if (!pdf && !/^image\//.test(f.type)) { alert('Solo PDF o imagen.'); return null; }
+    if (pdf && f.size > MAX_FILE) { alert('El PDF "' + f.name + '" pesa más de 8 MB.'); return null; }
+    var e = { nombre: pdf ? f.name : f.name.replace(/\.[^.]+$/, '') + '.jpg', tipo: tipo, data: null };
+    e.ready = (pdf ? readAsDataURL(f) : compress(f)).then(function (u) { e.data = u; });
+    return e;
+  }
+  function bindDrop(label, onFiles) {
+    var inp = label.querySelector('input');
+    inp.addEventListener('change', function () { onFiles(Array.prototype.slice.call(this.files)); this.value = ''; });
+    label.addEventListener('dragover', function (e) { e.preventDefault(); label.classList.add('drag'); });
+    label.addEventListener('dragleave', function () { label.classList.remove('drag'); });
+    label.addEventListener('drop', function (e) { e.preventDefault(); label.classList.remove('drag'); onFiles(Array.prototype.slice.call(e.dataTransfer.files || [])); });
+  }
+  ['drop-caratula', 'drop-csf'].forEach(function (id) {
+    var lab = $(id), tipo = lab.querySelector('input').dataset.tipo;
+    bindDrop(lab, function (fs) { var e = prepFile(fs[0], tipo); if (!e) return; state.files[tipo] = e; lab.classList.add('has-file'); lab.querySelector('.txt span').textContent = e.nombre; });
+  });
+  bindDrop($('drop-cot'), function (fs) { fs.slice(0, 5).forEach(function (f) { var e = prepFile(f, 'COTIZACION'); if (e) state.files.COTIZACION.push(e); }); renderChips(); });
+  function renderChips() {
+    $('cot-chips').innerHTML = '';
+    state.files.COTIZACION.forEach(function (f, i) { var c = document.createElement('span'); c.className = 'chip'; c.innerHTML = '<span>' + esc(f.nombre) + '</span><button type="button" aria-label="Quitar">×</button>'; c.querySelector('button').onclick = function () { state.files.COTIZACION.splice(i, 1); renderChips(); }; $('cot-chips').appendChild(c); });
+    $('drop-cot').classList.toggle('has-file', state.files.COTIZACION.length > 0);
+  }
+
+  // ---- validación y envío ----
+  function err(msg, el) { $('error-msg').textContent = msg; $('error-msg').classList.add('show'); if (el) { el.classList.add('invalid'); el.focus(); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return false; }
+  document.addEventListener('input', function (e) { if (e.target.classList) e.target.classList.remove('invalid'); });
+  document.addEventListener('change', function (e) { if (e.target.classList) e.target.classList.remove('invalid'); });
+  var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function validate(oc) {
+    $('error-msg').classList.remove('show');
+    if (!oc.solicitante) return err('Escribe quién solicita.', $('f-solicitante'));
+    if (!emailRe.test(oc.correoSolicitante)) return err('Escribe tu correo.', $('f-correo'));
+    if (!oc.autoriza) return err('Escribe el nombre de tu jefe inmediato.', $('f-autoriza'));
+    if (!emailRe.test(oc.correoAutoriza)) return err('Escribe el correo de quien autoriza.', $('f-correo-aut'));
+    if (oc.correoAutoriza === oc.correoSolicitante) return err('Quien autoriza debe ser otra persona.', $('f-correo-aut'));
+    if (!oc.empresa) return err('Selecciona la empresa.', $('f-empresa'));
+    if (!oc.cc) return err('Selecciona el centro de costos.', $('f-cc'));
+    if (state.provMode === 'cat' && !state.prov) return err('Selecciona un proveedor del catálogo o da de alta uno nuevo.', $('f-prov'));
+    if (state.provMode === 'nuevo') {
+      if (!oc.provNombre) return err('Escribe el nombre del proveedor nuevo.', $('n-nombre'));
+      if (oc.provRfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(oc.provRfc)) return err('El RFC del proveedor no es válido.', $('n-rfc'));
+      if (state.emite === 'SI' && !oc.provRfc) return err('Si el proveedor factura, captura su RFC.', $('n-rfc'));
+      if (!oc.provRegimen) return err('Selecciona el régimen fiscal del proveedor.', $('n-regimen'));
+      if (oc.provClabe && oc.provClabe.length === 18 && !clabeValid(oc.provClabe)) return err('La CLABE no es válida.', $('n-clabe'));
+    }
+    if (oc.provCorreo && !emailRe.test(oc.provCorreo)) return err('El correo del proveedor no es válido.', $('f-prov-correo'));
+    if (oc.moneda === 'DOLARES' && oc.tipoCambio <= 1) return err('Captura el tipo de cambio.', $('f-tc'));
+    for (var i = 0; i < oc.items.length; i++) {
+      var it = oc.items[i], q = state.items[i].q;
+      if (!(it.cantidad > 0)) return err('Partida ' + (i + 1) + ': captura la cantidad.', q('.i-cant'));
+      if (!it.descripcion) return err('Partida ' + (i + 1) + ': escribe la descripción.', q('.i-desc'));
+      if (!it.partida) return err('Partida ' + (i + 1) + ': selecciona el insumo.', q('.i-partida'));
+      if (!(it.precioUnitario > 0)) return err('Partida ' + (i + 1) + ': captura el precio unitario.', q('.i-pu'));
+    }
+    var t = O.calcular(oc); if (t.total <= 0) return err('El total debe ser mayor a cero.');
+    return true;
+  }
+
+  $('oc-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var oc = ocData(); if (!validate(oc)) return;
+    oc.totalLetra = O.letras(O.calcular(oc).total, oc.moneda);
+    var files = [state.files.CARATULA, state.files.CSF].filter(Boolean).filter(function () { return state.provMode === 'nuevo'; }).concat(state.files.COTIZACION);
+    try { localStorage.setItem('gfm_oc_me', JSON.stringify({ solicitante: oc.solicitante, correo: oc.correoSolicitante, autoriza: oc.autoriza, 'correo-aut': oc.correoAutoriza })); } catch (x) {}
+    $('overlay').hidden = false; $('submit-btn').disabled = true;
+    Promise.all(files.map(function (f) { return f.ready; })).then(function () {
+      if (!APPS_SCRIPT_URL) throw new Error('El formulario aún no está conectado al servidor.');
+      var sendOc = Object.assign({}, oc); if (state.provMode !== 'nuevo') delete sendOc.provClabe;
+      return fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ accion: 'crear', oc: sendOc, archivos: files.map(function (f) { return { nombre: f.nombre, tipo: f.tipo, data: f.data }; }) }) }).then(function (r) { return r.json(); });
+    }).then(function (d) {
+      if (!d || !d.ok) throw new Error(d && d.error || 'El servidor no respondió.');
+      oc.folio = d.folio; oc.estado = 'por_autorizar'; if (d.provNum) oc.provNum = d.provNum;
+      state.last = oc; showConfirm(oc);
+    }).catch(function (x) { err('No se pudo enviar: ' + (x && x.message || x) + ' Intenta de nuevo.'); })
+      .then(function () { $('overlay').hidden = true; $('submit-btn').disabled = false; });
+  });
+
+  function showConfirm(oc) {
+    $('oc-form').hidden = true; $('confirm-view').hidden = false; window.scrollTo(0, 0);
+    $('confirm-id').textContent = oc.folio;
+    $('confirm-text').innerHTML = 'Tu orden por <b>' + O.money(O.calcular(oc).total, oc.moneda) + '</b> a <b>' + esc(oc.provNombre) + '</b> se envió a <b>' + esc(oc.autoriza) + '</b> para su autorización. Te llegará un correo cuando la autorice o rechace.';
+  }
+  $('dl-pdf').addEventListener('click', function () {
+    var b = this; b.disabled = true; $('pdf-status').textContent = 'Generando PDF…';
+    O.buildPdf(state.last, { clabeCompleta: false }).then(function (doc) { doc.save(state.last.folio + '_FO-GF-02.pdf'); $('pdf-status').textContent = 'La versión final (con firma de autorización) la genera Compras.'; })
+      .catch(function () { $('pdf-status').textContent = 'No se pudo generar el PDF. Revisa tu conexión.'; }).then(function () { b.disabled = false; });
+  });
+  $('reset-link').addEventListener('click', function (e) { e.preventDefault(); location.reload(); });
+
+  addItem(); updRet(); loadProveedores();
+  window.__oc = { state: state, ocData: ocData, addItem: addItem };
+})();
+</script>
+</body>
+</html>

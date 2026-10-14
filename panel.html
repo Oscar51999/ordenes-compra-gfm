@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Panel Compras</title>
+<link rel="icon" href="panel.ico" type="image/x-icon">
+<meta name="theme-color" content="#431407">
+<link rel="stylesheet" href="oc.css">
+<style>
+  main { max-width: 1180px; }
+  .topbar-inner { max-width: 1180px; }
+  .gate { max-width: 380px; margin: 40px auto; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .conn { font-size: 12px; color: var(--ink-soft); }
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .kpi { border-top: 4px solid var(--kc); }
+  .kpi:nth-child(1) { --kc: var(--c3); } .kpi:nth-child(2) { --kc: var(--c1); } .kpi:nth-child(3) { --kc: var(--c2); } .kpi:nth-child(4) { --kc: var(--c5); } .kpi:nth-child(5) { --kc: var(--c4); }
+  .kpi .n { color: var(--kc); }
+  .kpi:hover, .kpi.on { border-color: var(--kc); background: color-mix(in srgb, var(--kc) 9%, var(--surface)); }
+  .kpi .l { font-size: 11.5px; color: var(--ink-soft); }
+  .kpi .n { font-family: 'Roboto Mono', monospace; font-size: 22px; font-weight: 600; margin-top: 2px; }
+  .kpi .s { font-size: 11.5px; color: var(--ink-soft); font-family: 'Roboto Mono', monospace; }
+  .filters { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  @media (max-width: 760px) { .filters { grid-template-columns: 1fr 1fr; } .filters > :first-child { grid-column: 1 / -1; } }
+  .filters input, .filters select { background: var(--surface); padding: 9px 10px; font-size: 13px; }
+  .list .tbl table { font-size: 12.5px; }
+  .list tr.row { cursor: pointer; }
+  .list tr.row:hover td { background: color-mix(in srgb, var(--c1) 7%, var(--surface)); }
+  .flag { font-size: 10.5px; font-weight: 600; color: var(--critical); margin-left: 6px; }
+  .empty { text-align: center; color: var(--ink-soft); padding: 28px 0; font-size: 13.5px; }
+  .drawer-bg { position: fixed; inset: 0; background: rgba(20,18,15,.45); z-index: 30; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: var(--paper); z-index: 31; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,.2); }
+  .drawer-head { position: sticky; top: 0; background: linear-gradient(120deg, #431407, #9A3412); color: #fff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 4px solid #E7C9A0; z-index: 2; }
+  .drawer-head .f { font-family: 'Roboto Mono', monospace; font-size: 18px; font-weight: 600; }
+  .drawer-head button { background: transparent; border: 1px solid rgba(255,255,255,.4); color: #fff; border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  .drawer-body { padding: 16px 18px 40px; }
+  .drawer .card { padding: 16px 18px; }
+  .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 12.5px; }
+  @media (max-width: 600px) { .kv { grid-template-columns: 1fr 1fr; } }
+  .kv .k { display: block; font-size: 10.5px; color: var(--ink-soft); }
+  .kv .v { font-weight: 600; word-break: break-word; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .hist { list-style: none; padding: 0; margin: 0; font-size: 12.5px; }
+  .hist li { padding: 7px 0 7px 16px; border-left: 2px solid var(--border); position: relative; }
+  .hist li::before { content: ''; position: absolute; left: -5px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--c2); }
+  .hist .when { color: var(--ink-soft); font-family: 'Roboto Mono', monospace; font-size: 11px; }
+  .modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(20,18,15,.55); z-index: 50; padding: 16px; }
+  .modal .card { width: min(480px, 100%); margin: 0; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #431407; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 60; box-shadow: var(--shadow); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand-stripe"></div>
+  <div class="topbar-inner">
+    <img class="brand-logo" src="logo-blanco.png" alt="Grupo Firme">
+    <h1>Panel de Órdenes de Compra</h1>
+    <p class="lede">Seguimiento de autorizaciones, envío al proveedor, facturas y pagos.</p>
+    <p class="code-line">FO-GF-02 · Compras / Finanzas</p>
+  </div>
+</div>
+
+<main>
+  <div class="card gate" id="gate">
+    <h2 class="section-title">Acceso</h2>
+    <div class="field"><label for="g-pwd">Contraseña</label><input type="password" id="g-pwd" autocomplete="current-password"></div>
+    <p class="error-msg" id="gate-error"></p>
+    <button class="primary" id="g-btn" type="button">Entrar</button>
+  </div>
+
+  <div id="app" hidden>
+    <div class="bar">
+      <span class="conn" id="conn">Conectando…</span>
+      <div class="acts">
+        <button class="btn ghost sm" id="b-refresh" type="button">↻ Actualizar</button>
+        <button class="btn ghost sm" id="b-xlsx" type="button">⬇ Exportar Excel</button>
+        <a class="btn sm" href="index.html" target="_blank" rel="noopener">+ Nueva orden</a>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="filters">
+      <input type="search" id="f-q" placeholder="Buscar folio, proveedor, solicitante, REQ…">
+      <select id="f-estado"><option value="">Todos los estados</option></select>
+      <select id="f-empresa"><option value="">Todas las empresas</option></select>
+      <select id="f-alerta"><option value="">Sin filtro de alertas</option><option value="vencidas">Pago vencido</option><option value="nuevo">Proveedor nuevo por validar</option><option value="sinclabe">Sin CLABE</option></select>
+    </div>
+    <div class="list"><div class="tbl"><table id="tbl"></table></div><p class="empty" id="empty" hidden>No hay órdenes con estos filtros.</p></div>
+  </div>
+</main>
+
+<div class="drawer-bg" id="drawer-bg" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="Detalle de la orden">
+  <div class="drawer-head"><span class="f" id="d-folio"></span><span id="d-badge"></span><button type="button" id="d-close">Cerrar ✕</button></div>
+  <div class="drawer-body" id="d-body"></div>
+</aside>
+
+<div class="modal" id="send-modal" hidden>
+  <div class="card">
+    <h2 class="section-title">Enviar al proveedor</h2>
+    <p class="section-hint">Se adjunta el PDF FO-GF-02 y se copia al solicitante y a Compras.</p>
+    <div class="field"><label for="s-to">Correo del proveedor</label><input type="email" id="s-to"></div>
+    <div class="field"><label for="s-msg">Mensaje <span class="opt">(opcional)</span></label><textarea id="s-msg" placeholder="Fecha y lugar de entrega, contacto en obra…"></textarea></div>
+    <p class="error-msg" id="s-err"></p>
+    <div class="acts"><button class="btn" id="s-go" type="button">Enviar orden</button><button class="btn ghost" id="s-cancel" type="button">Cancelar</button></div>
+  </div>
+</div>
+<div class="overlay" id="overlay" hidden><div class="box"><div class="spinner"></div><p id="overlay-text" style="margin:0">Procesando…</p></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="oc-core.js"></script>
+<script>
+(function () {
+  'use strict';
+  var APPS_SCRIPT_URL = '';  // misma URL /exec que index.html
+  var POLL_MS = 30000;
+  var O = window.OC, esc = O.esc, money = O.money;
+  function $(id) { return document.getElementById(id); }
+  var KEY = '', all = [], current = null, kpiFilter = '', timer = null;
+
+  O.ESTADOS.forEach(function (e) { $('f-estado').insertAdjacentHTML('beforeend', '<option value="' + e.id + '">' + e.l + '</option>'); });
+  O.EMPRESAS.forEach(function (e) { $('f-empresa').insertAdjacentHTML('beforeend', '<option>' + esc(e.nombre) + '</option>'); });
+
+  function toast(m) { var t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(function () { t.hidden = true; }, 3200); }
+  function busy(on, txt) { $('overlay').hidden = !on; if (txt) $('overlay-text').textContent = txt; }
+  function api(params) {
+    var qs = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+    return fetch(APPS_SCRIPT_URL + '?' + qs + '&key=' + encodeURIComponent(KEY)).then(function (r) { return r.json(); });
+  }
+  function post(body) { body.key = KEY; return fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
+
+  // ---------- acceso ----------
+  function tryLogin(pwd, silent) {
+    if (!APPS_SCRIPT_URL) { $('gate-error').textContent = 'El panel aún no está conectado al servidor.'; $('gate-error').classList.add('show'); return; }
+    KEY = pwd; $('g-btn').disabled = true;
+    api({ action: 'ping' }).then(function (d) {
+      if (!d || !d.ok) { KEY = ''; try { sessionStorage.removeItem('gfm_oc_key'); } catch (e) {} if (!silent) { $('gate-error').textContent = d && d.error === 'unauthorized' ? 'Contraseña incorrecta.' : 'No se pudo conectar con el servidor.'; $('gate-error').classList.add('show'); } return; }
+      try { sessionStorage.setItem('gfm_oc_key', pwd); } catch (e) {}
+      $('gate').hidden = true; $('app').hidden = false; load(); timer = setInterval(load, POLL_MS);
+    }).catch(function () { $('gate-error').textContent = 'No se pudo conectar con el servidor.'; $('gate-error').classList.add('show'); }).then(function () { $('g-btn').disabled = false; });
+  }
+  $('g-btn').addEventListener('click', function () { tryLogin($('g-pwd').value); });
+  $('g-pwd').addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(this.value); });
+  try { var saved = sessionStorage.getItem('gfm_oc_key'); if (saved) tryLogin(saved, true); } catch (e) {}
+
+  // ---------- datos ----------
+  function load() {
+    return api({ action: 'list' }).then(function (d) {
+      if (!d.ok) throw new Error(d.error);
+      all = (d.items || []).sort(function (a, b) { return String(b.folio).localeCompare(String(a.folio)); });
+      $('conn').textContent = 'Conectado · ' + all.length + ' órdenes · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      render();
+      if (current) { var c = all.filter(function (x) { return x.folio === current.folio; })[0]; if (c && c.updatedAt !== current.updatedAt) openDetail(c); }
+    }).catch(function () { $('conn').textContent = 'Sin conexión con el servidor'; });
+  }
+  $('b-refresh').addEventListener('click', load);
+
+  function today() { return O.todayISO(); }
+  function vencida(r) { return r.fechaPagoEstimada && String(r.fechaPagoEstimada).slice(0, 10) < today() && ['autorizada', 'enviada', 'recibida', 'facturada'].indexOf(r.estado) >= 0; }
+  function nuevoPend(r) { return r.provNuevo === 'SI' && ['rechazada', 'cancelada', 'pagada'].indexOf(r.estado) < 0; }
+  function sinClabe(r) { return !String(r.provClabe || '').replace(/\D/g, '') && ['rechazada', 'cancelada', 'pagada'].indexOf(r.estado) < 0; }
+  function badge(e) { var s = O.ESTADOS.filter(function (x) { return x.id === e; })[0] || { l: e || '—', tone: 'mute' }; return '<span class="badge ' + s.tone + '">' + esc(s.l) + '</span>'; }
+  function totMXN(r) { return O.num(r.totalMXN || r.total); }
+
+  var KPIS = [
+    { id: 'por_autorizar', l: 'Por autorizar', f: function (r) { return r.estado === 'por_autorizar'; } },
+    { id: 'autorizada', l: 'Autorizadas sin enviar', f: function (r) { return r.estado === 'autorizada'; } },
+    { id: 'transito', l: 'Enviadas / recibidas', f: function (r) { return r.estado === 'enviada' || r.estado === 'recibida'; } },
+    { id: 'facturada', l: 'Facturadas por pagar', f: function (r) { return r.estado === 'facturada'; } },
+    { id: 'vencidas', l: 'Pago vencido', f: vencida }
+  ];
+  function render() {
+    $('kpis').innerHTML = KPIS.map(function (k) { var rs = all.filter(k.f); var m = rs.reduce(function (a, r) { return a + totMXN(r); }, 0); return '<button type="button" class="kpi' + (kpiFilter === k.id ? ' on' : '') + '" data-k="' + k.id + '"><div class="l">' + k.l + '</div><div class="n">' + rs.length + '</div><div class="s">' + money(m) + '</div></button>'; }).join('');
+    Array.prototype.forEach.call($('kpis').querySelectorAll('.kpi'), function (b) { b.onclick = function () { kpiFilter = kpiFilter === b.dataset.k ? '' : b.dataset.k; render(); }; });
+    var rows = filtered();
+    $('empty').hidden = rows.length > 0;
+    $('tbl').innerHTML = '<tr><th>Folio</th><th>Fecha</th><th>Estado</th><th>Proveedor</th><th>Solicita</th><th>Centro de costos</th><th class="r">Total</th><th>Pago aprox.</th></tr>' + rows.map(function (r) {
+      var flags = (vencida(r) ? '<span class="flag">VENCIDA</span>' : '') + (nuevoPend(r) ? '<span class="flag" style="color:var(--warn)">PROV. NUEVO</span>' : '');
+      return '<tr class="row" data-f="' + esc(r.folio) + '"><td class="mono">' + esc(r.folio) + (r.reqFolio ? '<br><span class="hint" style="margin:0">' + esc(r.reqFolio) + '</span>' : '') + '</td><td>' + O.fmtDate(r.fecha) + '</td><td>' + badge(r.estado) + '</td><td class="wrap">' + esc(r.provNombre) + flags + '</td><td class="wrap">' + esc(r.solicitante) + '</td><td class="wrap">' + esc(r.cc) + '</td><td class="r">' + money(r.total, r.moneda) + '</td><td>' + O.fmtDate(r.fechaPagoEstimada) + '</td></tr>';
+    }).join('');
+    Array.prototype.forEach.call($('tbl').querySelectorAll('tr.row'), function (tr) { tr.onclick = function () { openDetail(all.filter(function (x) { return x.folio === tr.dataset.f; })[0]); }; });
+  }
+  function filtered() {
+    var q = $('f-q').value.trim().toLowerCase(), est = $('f-estado').value, emp = $('f-empresa').value, al = $('f-alerta').value;
+    var kf = KPIS.filter(function (k) { return k.id === kpiFilter; })[0];
+    return all.filter(function (r) {
+      if (kf && !kf.f(r)) return false;
+      if (est && r.estado !== est) return false;
+      if (emp && r.empresa !== emp) return false;
+      if (al === 'vencidas' && !vencida(r)) return false;
+      if (al === 'nuevo' && !nuevoPend(r)) return false;
+      if (al === 'sinclabe' && !sinClabe(r)) return false;
+      if (q) { var hay = [r.folio, r.reqFolio, r.provNombre, r.provRfc, r.provNum, r.solicitante, r.autoriza, r.cc, r.facturaRef].concat((r.items || []).map(function (i) { return i.descripcion; })).join(' ').toLowerCase(); if (hay.indexOf(q) < 0) return false; }
+      return true;
+    });
+  }
+  ['f-q', 'f-estado', 'f-empresa', 'f-alerta'].forEach(function (id) { $(id).addEventListener('input', render); });
+
+  // ---------- detalle ----------
+  function openDetail(r) {
+    if (!r) return; current = r;
+    $('drawer').hidden = $('drawer-bg').hidden = false;
+    $('d-folio').textContent = r.folio; $('d-badge').innerHTML = badge(r.estado);
+    var t = O.calcular(JSON.parse(JSON.stringify(r))), mon = r.moneda;
+    var kv = function (arr) { return '<div class="kv">' + arr.map(function (x) { return '<div><span class="k">' + x[0] + '</span><span class="v">' + (x[2] ? x[1] : esc(x[1] || '—')) + '</span></div>'; }).join('') + '</div>'; };
+    var adj = (r.adjuntos || []).map(function (a) { return '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(a.url) + '">' + esc(a.tipo || 'Archivo') + ': ' + esc(a.nombre) + '</a>'; }).join(' ');
+    var L = [['Importe', t.bruto]]; if (t.amort) L.push(['Amort. anticipo', -t.amort]); if (t.fondo) L.push(['Fondo de garantía', -t.fondo]); if (t.otras) L.push(['Otras retenciones', -t.otras]);
+    L.push(['Subtotal', t.subtotal], ['IVA', t.iva]); if (t.retIsr) L.push(['Ret. ISR ' + O.pct(r.retIsrPct), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.pct(r.retIvaPct), -t.retIva]);
+    var tot = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + money(Math.abs(x[1]), mon) + '</span></div>'; }).join('') + '<div class="tot-line grand"><span>Total</span><span>' + money(t.total, mon) + '</span></div>';
+    var clabe = String(r.provClabe || '').replace(/\D/g, '');
+    $('d-body').innerHTML =
+      (vencida(r) ? '<p class="note warn">El pago estimado (' + O.fmtDate(r.fechaPagoEstimada) + ') ya venció.</p>' : '') +
+      (nuevoPend(r) ? '<p class="note warn">Proveedor nuevo #' + esc(r.provNum) + ': valida sus datos en la pestaña Proveedores de la hoja.</p>' : '') +
+      '<div class="card"><p class="sub-title section-title" style="font-size:16px">Acciones</p><div class="acts">' +
+        '<button class="btn sm" id="a-pdf" type="button">⬇ PDF FO-GF-02</button>' +
+        (['autorizada', 'enviada'].indexOf(r.estado) >= 0 ? '<button class="btn ok sm" id="a-send" type="button">✉ ' + (r.estado === 'enviada' ? 'Reenviar' : 'Enviar') + ' al proveedor</button>' : '') +
+        (r.estado === 'por_autorizar' ? '<button class="btn ghost sm" id="a-remind" type="button">Recordar a ' + esc(r.autoriza) + '</button>' : '') +
+        (r.carpetaUrl ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(r.carpetaUrl) + '">Carpeta Drive</a>' : '') +
+        (r.pdfUrl ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(r.pdfUrl) + '">PDF enviado</a>' : '') +
+      '</div>' + (adj ? '<div class="acts" style="margin-top:10px">' + adj + '</div>' : '') + '</div>' +
+      '<div class="card"><p class="section-title" style="font-size:16px">Seguimiento</p>' +
+        '<div class="row2"><div class="field"><label for="e-estado">Estado</label><select id="e-estado">' + O.ESTADOS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === r.estado ? ' selected' : '') + '>' + e.l + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="e-com">Comentario <span class="opt">(se envía al solicitante)</span></label><input type="text" id="e-com" value="' + esc(r.comentarioAdmin) + '"></div></div>' +
+        '<div class="row3"><div class="field"><label for="e-fact">Factura (serie-folio / UUID)</label><input type="text" id="e-fact" value="' + esc(r.facturaRef) + '"></div>' +
+        '<div class="field"><label for="e-fpago">Fecha de pago</label><input type="date" id="e-fpago" value="' + esc(String(r.fechaPago || '').slice(0, 10)) + '"></div>' +
+        '<div class="field"><label for="e-pcorreo">Correo proveedor</label><input type="email" id="e-pcorreo" value="' + esc(r.provCorreo) + '"></div></div>' +
+        '<button class="btn sm" id="e-save" type="button">Guardar cambios</button></div>' +
+      '<div class="card"><p class="section-title" style="font-size:16px">Orden</p>' + kv([
+        ['Fecha', O.fmtDate(r.fecha)], ['Tipo', r.tipoOC], ['Requisición', r.reqFolio || 'N/A'],
+        ['Solicita', r.solicitante + ' · ' + r.correoSolicitante], ['Autoriza', r.autoriza + ' · ' + r.correoAutoriza], ['Autorizó', r.autorizadoPor ? r.autorizadoPor + ' · ' + r.fechaAutorizacion : '—'],
+        ['Empresa', r.empresa], ['Centro de costos', r.cc], ['Frente / estimación', (r.frente || '—') + ' / ' + (r.estimacion || 'NA')]
+      ]) + (r.comentarioAutorizacion ? '<p class="hint">Comentario de autorización: ' + esc(r.comentarioAutorizacion) + '</p>' : '') + '</div>' +
+      '<div class="card"><p class="section-title" style="font-size:16px">Proveedor y pago</p>' + kv([
+        ['Proveedor', (r.provNum ? '#' + r.provNum + ' ' : '') + r.provNombre], ['RFC', r.provRfc], ['Régimen', r.provRegimen],
+        ['Banco', r.provBanco], ['CLABE / cuenta', clabe ? '<span class="mono">' + esc(clabe) + '</span>' : '<span style="color:var(--critical)">Sin registrar</span>', true], ['Servicio · factura', (r.servicio || 'Generales') + ' · ' + (r.emiteFactura === 'NO' ? 'No factura' : 'Factura')],
+        ['Forma de pago', r.formaPago], ['Método de pago', r.metodoPago], ['Uso CFDI', r.usoCfdi],
+        ['Crédito', +r.diasCredito ? r.diasCredito + ' días' : 'Contado'], ['Pago aprox.', O.fmtDate(r.fechaPagoEstimada)], ['Moneda', r.moneda + (r.moneda === 'DOLARES' ? ' · T.C. ' + r.tipoCambio : '')]
+      ]) + (r.enviadaA ? '<p class="hint">Enviada a: ' + esc(r.enviadaA) + '</p>' : '') + '</div>' +
+      '<div class="card"><p class="section-title" style="font-size:16px">Partidas</p><div class="tbl"><table><tr><th>Cant.</th><th>Descripción</th><th>Insumo</th><th>Obra</th><th>IVA</th><th class="r">P.U.</th><th class="r">Subtotal</th></tr>' +
+        (r.items || []).map(function (it) { return '<tr><td>' + esc(it.cantidad) + ' ' + esc(it.unidad) + '</td><td class="wrap">' + esc(it.descripcion) + '</td><td class="wrap">' + esc(it.partida) + '</td><td class="wrap">' + esc(it.obra) + '</td><td>' + (it.tasaIva === 'EXENTO' ? 'Exento' : O.num(it.tasaIva) * 100 + '%') + '</td><td class="r">' + money(it.precioUnitario, mon) + '</td><td class="r">' + money(O.num(it.cantidad) * O.num(it.precioUnitario), mon) + '</td></tr>'; }).join('') +
+        '</table></div><div class="totals" style="margin-top:12px"><p class="hint">' + esc(r.observaciones || '') + '</p><div><div class="tot-box">' + tot + '</div><p class="letra"><b>' + esc(O.letras(t.total, mon)) + '</b></p></div></div></div>' +
+      '<div class="card"><p class="section-title" style="font-size:16px">Historial</p><ul class="hist">' + (r.historial || []).slice().reverse().map(function (h) { return '<li><span class="when">' + esc(String(h.f || '').replace('T', ' ').slice(0, 16)) + '</span> · ' + badge(h.e) + ' · <b>' + esc(h.u) + '</b>' + (h.c ? '<br>' + esc(h.c) : '') + '</li>'; }).join('') + '</ul></div>';
+
+    $('a-pdf').onclick = function () { busy(true, 'Generando PDF…'); O.buildPdf(r, { clabeCompleta: true }).then(function (doc) { doc.save(r.folio + '_FO-GF-02.pdf'); }).catch(function () { toast('No se pudo generar el PDF'); }).then(function () { busy(false); }); };
+    if ($('a-send')) $('a-send').onclick = function () { $('s-to').value = r.provCorreo || ''; $('s-msg').value = ''; $('s-err').classList.remove('show'); $('send-modal').hidden = false; $('s-to').focus(); };
+    if ($('a-remind')) $('a-remind').onclick = function () { busy(true, 'Enviando recordatorio…'); post({ accion: 'reenviarAutorizacion', folio: r.folio }).then(function (d) { toast(d.ok ? 'Recordatorio enviado a ' + r.correoAutoriza : d.error); }).catch(function () { toast('Error de conexión'); }).then(function () { busy(false); }); };
+    $('e-save').onclick = function () {
+      var campos = { estado: $('e-estado').value, comentarioAdmin: $('e-com').value.trim(), facturaRef: $('e-fact').value.trim(), fechaPago: $('e-fpago').value, provCorreo: $('e-pcorreo').value.trim() };
+      if (campos.estado === 'pagada' && !campos.fechaPago) { toast('Captura la fecha de pago'); return; }
+      if (campos.estado === 'cancelada' && !campos.comentarioAdmin) { toast('Escribe el motivo de la cancelación'); return; }
+      busy(true, 'Guardando…');
+      post({ accion: 'actualizar', folio: r.folio, campos: campos, usuario: 'Panel Compras' }).then(function (d) {
+        if (!d.ok) throw new Error(d.error); toast('Guardado' + (campos.estado !== r.estado ? ' · se avisó al solicitante' : '')); return load();
+      }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); });
+    };
+  }
+  function closeDetail() { $('drawer').hidden = $('drawer-bg').hidden = true; current = null; }
+  $('d-close').onclick = closeDetail; $('drawer-bg').onclick = closeDetail;
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('send-modal').hidden) $('send-modal').hidden = true; else closeDetail(); } });
+
+  $('s-cancel').onclick = function () { $('send-modal').hidden = true; };
+  $('s-go').onclick = function () {
+    var r = current, to = $('s-to').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { $('s-err').textContent = 'Correo inválido.'; $('s-err').classList.add('show'); return; }
+    $('send-modal').hidden = true; busy(true, 'Generando y enviando…');
+    var rr = JSON.parse(JSON.stringify(r)); rr.estado = 'enviada';
+    O.buildPdf(rr, { clabeCompleta: true }).then(function (doc) {
+      return post({ accion: 'enviarProveedor', folio: r.folio, correo: to, mensaje: $('s-msg').value.trim(), pdf: doc.output('datauristring'), usuario: 'Panel Compras' });
+    }).then(function (d) { if (!d.ok) throw new Error(d.error); toast('Orden enviada a ' + to); return load(); })
+      .catch(function (x) { toast('No se envió: ' + (x.message || x)); }).then(function () { busy(false); });
+  };
+
+  // ---------- Excel ----------
+  $('b-xlsx').onclick = function () {
+    var rows = filtered(); if (!rows.length) { toast('No hay órdenes para exportar'); return; }
+    busy(true, 'Generando Excel…');
+    (window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); })).then(function () {
+      var A = rows.map(function (r) { return { Folio: r.folio, Fecha: O.fmtDate(r.fecha), Estado: O.ESTADO_LABEL[r.estado] || r.estado, Requisicion: r.reqFolio, Empresa: r.empresa, 'Centro de costos': r.cc, Solicita: r.solicitante, Autoriza: r.autoriza, 'Autorizó': r.autorizadoPor, 'No. proveedor': r.provNum, Proveedor: r.provNombre, RFC: r.provRfc, Banco: r.provBanco, CLABE: String(r.provClabe || ''), 'Días crédito': +r.diasCredito || 0, 'Pago aprox.': O.fmtDate(r.fechaPagoEstimada), Moneda: r.moneda, Subtotal: O.num(r.subtotal), IVA: O.num(r.iva), 'Ret. ISR': O.num(r.retIsr), 'Ret. IVA': O.num(r.retIva), Total: O.num(r.total), 'Total MXN': O.num(r.totalMXN), Factura: r.facturaRef, 'Fecha pago': O.fmtDate(r.fechaPago) }; });
+      var B = []; rows.forEach(function (r) { (r.items || []).forEach(function (it, i) { B.push({ Folio: r.folio, Partida: i + 1, Obra: it.obra, Insumo: it.partida, Cantidad: O.num(it.cantidad), Unidad: it.unidad, 'Descripción': it.descripcion, 'P.U.': O.num(it.precioUnitario), IVA: it.tasaIva, Subtotal: O.r2(O.num(it.cantidad) * O.num(it.precioUnitario)), Proveedor: r.provNombre, Estado: O.ESTADO_LABEL[r.estado] }); }); });
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(A), 'Ordenes');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(B), 'Partidas');
+      XLSX.writeFile(wb, 'Ordenes_de_Compra_' + O.todayISO() + '.xlsx');
+    }).catch(function () { toast('No se pudo generar el Excel'); }).then(function () { busy(false); });
+  };
+})();
+</script>
+</body>
+</html>

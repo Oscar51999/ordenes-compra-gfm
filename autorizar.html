@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Autorizar Orden</title>
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<meta name="theme-color" content="#431407">
+<link rel="stylesheet" href="oc.css">
+<style>
+  .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 18px; font-size: 13px; margin-bottom: 18px; }
+  @media (max-width: 600px) { .kv { grid-template-columns: 1fr 1fr; } }
+  .kv .k { display: block; font-size: 11px; color: var(--ink-soft); }
+  .kv .v { font-weight: 600; word-break: break-word; }
+  .big-total { font-family: 'Roboto Mono', monospace; font-size: 28px; font-weight: 600; color: var(--c2); margin: 4px 0 2px; }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .folio { font-family: 'Roboto Mono', monospace; font-weight: 600; font-size: 22px; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .result { text-align: center; padding: 18px 0 6px; }
+  .result .big { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 700; text-transform: uppercase; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand-stripe"></div>
+  <div class="topbar-inner">
+    <img class="brand-logo" src="logo-blanco.png" alt="Grupo Firme">
+    <h1>Autorizar orden de compra</h1>
+    <p class="lede">Revisa la orden y autorízala o recházala. Quien la solicitó recibe tu respuesta por correo.</p>
+  </div>
+</div>
+<main>
+  <div class="card" id="loading"><p style="margin:0">Cargando orden…</p></div>
+  <div class="card" id="bad" hidden><p class="section-title">Liga no válida</p><p id="bad-msg" style="color:var(--ink-soft)"></p></div>
+
+  <div id="view" hidden>
+    <div class="card">
+      <div class="head-row">
+        <div><div class="folio" id="v-folio"></div><div id="v-estado"></div></div>
+        <div style="text-align:right"><div class="hint" style="margin:0">Total</div><div class="big-total" id="v-total"></div><div class="hint" id="v-letra" style="margin:0"></div></div>
+      </div>
+      <div class="kv" id="v-kv"></div>
+      <div class="tbl"><table id="v-items"></table></div>
+      <div class="tot-box" id="v-tot" style="margin-top:14px"></div>
+      <p class="hint" id="v-obs"></p>
+      <p style="margin-top:14px"><button type="button" class="btn ghost sm" id="v-pdf">Ver PDF de la orden</button></p>
+    </div>
+
+    <div class="card c2" id="decide">
+      <h2 class="section-title">Tu decisión</h2>
+      <div class="row2">
+        <div class="field"><label for="d-nombre">Tu nombre</label><input type="text" id="d-nombre"></div>
+        <div class="field"><label for="d-com">Comentario <span class="opt">(obligatorio si rechazas)</span></label><input type="text" id="d-com"></div>
+      </div>
+      <p class="error-msg" id="d-err"></p>
+      <div class="actions">
+        <button type="button" class="btn ok" id="d-ok">✓ Autorizar</button>
+        <button type="button" class="btn danger" id="d-no">✕ Rechazar</button>
+      </div>
+    </div>
+    <div class="card c1" id="done" hidden><div class="result"><span id="done-badge"></span><p class="big" id="done-big"></p><p class="hint" id="done-txt"></p></div></div>
+  </div>
+</main>
+<footer>Grupo Firme · Órdenes de Compra · FO-GF-02</footer>
+<script src="oc-core.js"></script>
+<script>
+(function () {
+  'use strict';
+  var APPS_SCRIPT_URL = '';  // misma URL /exec que index.html
+  var O = window.OC, esc = O.esc;
+  function $(id) { return document.getElementById(id); }
+  var qs = new URLSearchParams(location.search), folio = qs.get('folio') || '', tok = qs.get('t') || '', oc = null;
+
+  function bad(msg) { $('loading').hidden = true; $('bad').hidden = false; $('bad-msg').textContent = msg; }
+  if (!folio || !tok) return bad('Falta el folio o la clave. Abre la liga completa desde tu correo.');
+  if (!APPS_SCRIPT_URL) return bad('La página aún no está conectada al servidor.');
+
+  fetch(APPS_SCRIPT_URL + '?action=auth&folio=' + encodeURIComponent(folio) + '&t=' + encodeURIComponent(tok)).then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.ok) return bad(d.error || 'No se encontró la orden.');
+    oc = d.oc; render(d.pendiente);
+  }).catch(function () { bad('No se pudo conectar con el servidor. Intenta de nuevo.'); });
+
+  function estadoBadge(e) { var s = O.ESTADOS.filter(function (x) { return x.id === e; })[0] || { l: e, tone: 'mute' }; return '<span class="badge ' + s.tone + '">' + esc(s.l) + '</span>'; }
+  function render(pendiente) {
+    $('loading').hidden = true; $('view').hidden = false;
+    var t = O.calcular(oc), mon = oc.moneda;
+    $('v-folio').textContent = oc.folio; $('v-estado').innerHTML = estadoBadge(oc.estado);
+    $('v-total').textContent = O.money(t.total, mon); $('v-letra').textContent = O.letras(t.total, mon);
+    var kv = [['Solicita', oc.solicitante], ['Empresa', oc.empresa], ['Centro de costos', oc.cc], ['Proveedor', (oc.provNum ? '#' + oc.provNum + ' ' : '') + oc.provNombre + (oc.provNuevo === 'SI' ? ' (nuevo)' : '')], ['RFC', oc.provRfc || '—'], ['Tipo de orden', oc.tipoOC], ['Requisición', oc.reqFolio || 'N/A'], ['Crédito', +oc.diasCredito ? oc.diasCredito + ' días' : 'Contado'], ['Fecha', O.fmtDate(oc.fecha)]];
+    $('v-kv').innerHTML = kv.map(function (x) { return '<div><span class="k">' + x[0] + '</span><span class="v">' + esc(x[1]) + '</span></div>'; }).join('');
+    $('v-items').innerHTML = '<tr><th>Cant.</th><th>Descripción</th><th>Obra</th><th class="r">P.U.</th><th class="r">Subtotal</th></tr>' + (oc.items || []).map(function (it) { return '<tr><td>' + esc(it.cantidad) + ' ' + esc(it.unidad) + '</td><td class="wrap">' + esc(it.descripcion) + '</td><td class="wrap">' + esc(it.obra) + '</td><td class="r">' + O.money(it.precioUnitario, mon) + '</td><td class="r">' + O.money(O.num(it.cantidad) * O.num(it.precioUnitario), mon) + '</td></tr>'; }).join('');
+    var L = [['Subtotal', t.subtotal], ['IVA', t.iva]]; if (t.retIsr) L.push(['Ret. ISR', -t.retIsr]); if (t.retIva) L.push(['Ret. IVA', -t.retIva]);
+    $('v-tot').innerHTML = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + O.money(Math.abs(x[1]), mon) + '</span></div>'; }).join('') + '<div class="tot-line grand"><span>Total</span><span>' + O.money(t.total, mon) + '</span></div>';
+    $('v-obs').textContent = oc.observaciones ? 'Observaciones: ' + oc.observaciones : '';
+    $('d-nombre').value = oc.autoriza || '';
+    if (!pendiente) { $('decide').hidden = true; done(oc.estado, 'Esta orden ya fue atendida' + (oc.autorizadoPor ? ' por ' + oc.autorizadoPor : '') + '.'); }
+  }
+  function done(estado, txt) {
+    $('decide').hidden = true; $('done').hidden = false;
+    $('done-badge').innerHTML = estadoBadge(estado); $('done-big').textContent = O.ESTADO_LABEL[estado] || estado; $('done-txt').textContent = txt;
+    $('v-estado').innerHTML = estadoBadge(estado);
+  }
+  function decide(decision) {
+    var com = $('d-com').value.trim(), nom = $('d-nombre').value.trim();
+    $('d-err').classList.remove('show');
+    if (decision === 'rechazar' && !com) { $('d-err').textContent = 'Escribe el motivo del rechazo.'; $('d-err').classList.add('show'); $('d-com').focus(); return; }
+    $('d-ok').disabled = $('d-no').disabled = true;
+    fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ accion: 'decidir', folio: folio, t: tok, decision: decision, comentario: com, nombre: nom }) })
+      .then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) { if (d.estado) return done(d.estado, d.error); throw new Error(d.error); }
+        oc.estado = d.estado; oc.autorizadoPor = nom; oc.fechaAutorizacion = O.todayISO();
+        done(d.estado, d.estado === 'autorizada' ? 'Listo. Compras ya puede enviarla al proveedor.' : 'Se avisó a quien la solicitó con tu comentario.');
+      }).catch(function (x) { $('d-err').textContent = 'No se pudo guardar: ' + (x && x.message || x); $('d-err').classList.add('show'); $('d-ok').disabled = $('d-no').disabled = false; });
+  }
+  $('d-ok').addEventListener('click', function () { decide('autorizar'); });
+  $('d-no').addEventListener('click', function () { decide('rechazar'); });
+  $('v-pdf').addEventListener('click', function () {
+    var w = window.open('', '_blank');
+    O.buildPdf(oc, { clabeCompleta: false }).then(function (doc) { var url = doc.output('bloburl'); if (w) w.location = url; else location.href = url; }).catch(function () { if (w) w.close(); alert('No se pudo generar el PDF.'); });
+  });
+})();
+</script>
+</body>
+</html>
