@@ -133,6 +133,7 @@
 
     <div class="sub-box" id="nuevo-box" hidden>
       <p class="sub-title">Alta de proveedor <span class="badge warn">Compras lo valida</span></p>
+      <label class="drop field" id="drop-cfdi" style="margin-bottom:14px"><input type="file" accept=".xml,.pdf,application/pdf,text/xml,application/xml"><span class="ico" style="background:var(--c2)">XML</span><span class="txt"><strong>Llenar con CFDI o constancia fiscal</strong><span id="cfdi-txt">Opcional · XML o PDF; llena nombre, RFC y régimen</span></span></label>
       <div class="row2">
         <div class="field"><label for="n-nombre">Nombre o razón social</label><input type="text" id="n-nombre"></div>
         <div class="field"><label for="n-rfc">RFC</label><input type="text" id="n-rfc" class="mono" maxlength="13"><p class="hint" id="n-rfc-hint"></p></div>
@@ -486,6 +487,18 @@
     label.addEventListener('dragleave', function () { label.classList.remove('drag'); });
     label.addEventListener('drop', function (e) { e.preventDefault(); label.classList.remove('drag'); onFiles(Array.prototype.slice.call(e.dataTransfer.files || [])); });
   }
+  bindDrop($('drop-cfdi'), function (fs) {
+    var f = fs[0]; if (!f) return; $('cfdi-txt').textContent = 'Leyendo ' + f.name + '…';
+    O.leerDocumentoProveedor(f).then(function (d) {
+      if (d.nombre) $('n-nombre').value = d.nombre;
+      if (d.rfc) { $('n-rfc').value = d.rfc; $('n-rfc').dispatchEvent(new Event('input')); }
+      if (d.regimen) { $('n-regimen').value = d.regimen; updRet(); }
+      var got = [d.nombre && 'nombre', d.rfc && 'RFC', d.regimen && 'régimen'].filter(Boolean);
+      $('drop-cfdi').classList.add('has-file');
+      $('cfdi-txt').textContent = got.length ? 'Leído: ' + got.join(', ') + '. Revisa los datos.' : 'No se pudieron leer datos; captúralos a mano.';
+      if (/CONSTANCIA/i.test(d.fuente) && !state.files.CSF) { var e = prepFile(f, 'CSF'); if (e) { state.files.CSF = e; $('drop-csf').classList.add('has-file'); $('drop-csf').querySelector('.txt span').textContent = e.nombre; } }
+    }).catch(function (x) { $('cfdi-txt').textContent = x.message || 'No se pudo leer el archivo.'; });
+  });
   ['drop-caratula', 'drop-csf'].forEach(function (id) {
     var lab = $(id), tipo = lab.querySelector('input').dataset.tipo;
     bindDrop(lab, function (fs) { var e = prepFile(fs[0], tipo); if (!e) return; state.files[tipo] = e; lab.classList.add('has-file'); lab.querySelector('.txt span').textContent = e.nombre; });

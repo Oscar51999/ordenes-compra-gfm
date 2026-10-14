@@ -27,7 +27,7 @@
   CAT.tasasIva = [{ v: '0.16', l: '16 %' }, { v: '0.08', l: '8 % (frontera)' }, { v: '0', l: '0 %' }, { v: 'EXENTO', l: 'Exento' }];
 
   var ESTADOS = [
-    { id: 'por_autorizar', l: 'Por autorizar', tone: 'warn' },
+    { id: 'por_autorizar', l: 'Pendiente', tone: 'warn' },
     { id: 'autorizada', l: 'Autorizada', tone: 'ok' },
     { id: 'rechazada', l: 'Rechazada', tone: 'bad' },
     { id: 'enviada', l: 'Enviada al proveedor', tone: 'info' },
@@ -300,10 +300,91 @@
     });
   }
 
+
+  // ---------- lectura de CFDI (XML/PDF) o Constancia de Situación Fiscal (PDF) para alta de proveedor ----------
+  var RFC_RE = /\b([A-ZÑ&]{3,4})[\s-]?(\d{6})[\s-]?([A-Z0-9]{3})\b/g;
+  var EMPRESA_RFCS = EMPRESAS.map(function (e) { return e.rfc; }).filter(Boolean).concat(['XAXX010101000', 'XEXX010101000']);
+  function regimenPorCodigo(code) { code = String(code || '').trim(); return CAT.regimenes.filter(function (r) { return r.indexOf(code + ' ') === 0; })[0] || ''; }
+  var pdfjsP = null;
+  function loadPdfJs() {
+    if (pdfjsP) return pdfjsP;
+    pdfjsP = (global.pdfjsLib ? Promise.resolve() : loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js')).then(function () {
+      global.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; return global.pdfjsLib;
+    });
+    pdfjsP.catch(function () { pdfjsP = null; });
+    return pdfjsP;
+  }
+  function pdfText(file) {
+    return Promise.all([file.arrayBuffer(), loadPdfJs()]).then(function (r) { return r[1].getDocument({ data: r[0] }).promise; }).then(function (doc) {
+      var ps = []; for (var i = 1; i <= Math.min(doc.numPages, 3); i++) ps.push(doc.getPage(i).then(function (pg) { return pg.getTextContent(); }).then(function (tc) {
+        var lines = [], last = null, cur = [];
+        tc.items.forEach(function (it) { var y = Math.round(it.transform[5]); if (last !== null && Math.abs(y - last) > 3) { lines.push(cur.join(' ')); cur = []; } cur.push(it.str); last = y; });
+        lines.push(cur.join(' ')); return lines.join('\n');
+      }));
+      return Promise.all(ps);
+    }).then(function (t) { return t.join('\n'); });
+  }
+  function clean(s) { return String(s || '').replace(/\s+/g, ' ').replace(/^[\s:.\-]+|[\s:.\-]+$/g, '').trim(); }
+  function after(text, labels) {
+    for (var i = 0; i < labels.length; i++) {
+      var m = text.match(new RegExp(labels[i] + '\\s*[:.]?\\s*([^\\n]{2,120})', 'i'));
+      if (m && clean(m[1])) return clean(m[1]);
+    }
+    return '';
+  }
+  function parseXmlProveedor(xml) {
+    var d = new DOMParser().parseFromString(xml, 'application/xml');
+    var find = function (local) { var all = d.getElementsByTagName('*'); for (var i = 0; i < all.length; i++) if (all[i].localName === local) return all[i]; return null; };
+    var em = find('Emisor'), re = find('Receptor'), comp = find('Comprobante');
+    if (!em) return null;
+    var pick = em;
+    if (EMPRESA_RFCS.indexOf(String(em.getAttribute('Rfc') || '').toUpperCase()) < 0 && re && EMPRESA_RFCS.indexOf(String(re.getAttribute('Rfc') || '').toUpperCase()) < 0) pick = em;
+    else if (EMPRESA_RFCS.indexOf(String(em.getAttribute('Rfc') || '').toUpperCase()) >= 0 && re) pick = re;
+    var reg = pick.getAttribute('RegimenFiscal') || pick.getAttribute('RegimenFiscalReceptor') || '';
+    return { fuente: 'XML del CFDI', nombre: clean(pick.getAttribute('Nombre')).toUpperCase(), rfc: String(pick.getAttribute('Rfc') || '').toUpperCase(), regimen: regimenPorCodigo(reg), cp: pick === re ? (re.getAttribute('DomicilioFiscalReceptor') || '') : (comp && comp.getAttribute('LugarExpedicion') || '') };
+  }
+  function parsePdfProveedor(text) {
+    var T = text.replace(/\r/g, '');
+    var esCsf = /CONSTANCIA DE SITUACI[OÓ]N FISCAL|C[eé]dula de identificaci[oó]n fiscal/i.test(T);
+    var out = { fuente: esCsf ? 'Constancia de situación fiscal (PDF)' : 'PDF del CFDI', nombre: '', rfc: '', regimen: '', cp: '' };
+    var rfcs = [], m; RFC_RE.lastIndex = 0;
+    var up = T.toUpperCase();
+    while ((m = RFC_RE.exec(up))) { var r = m[1] + m[2] + m[3]; if (rfcs.indexOf(r) < 0) rfcs.push(r); }
+    var lbl = up.match(/RFC\s*(?:DEL\s*)?(?:EMISOR)?\s*[:.]?\s*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/);
+    out.rfc = (lbl && EMPRESA_RFCS.indexOf(lbl[1]) < 0 ? lbl[1] : '') || rfcs.filter(function (x) { return EMPRESA_RFCS.indexOf(x) < 0; })[0] || '';
+    if (esCsf) {
+      var razon = after(T, ['Denominaci[oó]n\\s*/\\s*Raz[oó]n\\s*Social', 'Denominaci[oó]n o Raz[oó]n Social', 'Raz[oó]n Social']);
+      var nom = after(T, ['Nombre\\s*\\(s\\)']), ap1 = after(T, ['Primer Apellido']), ap2 = after(T, ['Segundo Apellido']);
+      out.nombre = (razon && !/R[eé]gimen|Capital/i.test(razon) ? razon : [nom, ap1, ap2].filter(Boolean).join(' ')).toUpperCase();
+      out.cp = (T.match(/C[oó]digo\s*Postal\s*[:.]?\s*(\d{5})/i) || [])[1] || '';
+    } else {
+      out.nombre = after(T, ['Nombre\\s*(?:del\\s*)?emisor', 'Raz[oó]n\\s*social\\s*(?:del\\s*)?emisor', 'Emisor\\s*:?\\s*Nombre', 'Emisor']).replace(/RFC.*$/i, '').toUpperCase();
+      out.cp = (T.match(/(?:Lugar\s*de\s*expedici[oó]n|C\.?\s*P\.?)\s*[:.]?\s*(\d{5})/i) || [])[1] || '';
+    }
+    out.nombre = clean(out.nombre.replace(/[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}/g, ''));
+    var regs = T.match(/\b(60[1-9]|61[0-9]|62[0-9])\b/g) || [];
+    var rg = T.match(/R[eé]gimen\s*Fiscal[^\n]{0,20}?(\d{3})/i);
+    out.regimen = regimenPorCodigo(rg ? rg[1] : '') || '';
+    if (!out.regimen) {
+      var byName = CAT.regimenes.filter(function (r) { var n = r.slice(6).split(' ').slice(0, 3).join(' ').toUpperCase(); return n.length > 8 && up.indexOf(n) >= 0; })[0];
+      out.regimen = byName || (regs[0] ? regimenPorCodigo(regs[0]) : '');
+    }
+    return out;
+  }
+  var BANCOS = { '002': 'BANAMEX', '012': 'BBVA BANCOMER', '014': 'SANTANDER', '021': 'HSBC', '030': 'BAJIO', '036': 'INBURSA', '042': 'MIFEL', '044': 'SCOTIABANK', '058': 'BANREGIO', '059': 'INVEX', '062': 'AFIRME', '072': 'BANORTE', '106': 'BANK OF AMERICA', '127': 'AZTECA', '128': 'AUTOFIN', '130': 'COMPARTAMOS', '137': 'BANCOPPEL', '138': 'ABC CAPITAL', '140': 'CONSUBANCO', '143': 'CIBANCO', '145': 'BBASE', '147': 'BANKAOOL', '156': 'SABADELL', '166': 'BANSEFI', '638': 'NU MEXICO', '646': 'STP', '722': 'MERCADO PAGO' };
+  function clabeValid(c) { if (!/^\d{18}$/.test(c)) return false; var w = [3, 7, 1], t = 0; for (var i = 0; i < 17; i++) t += (+c[i] * w[i % 3]) % 10; return (10 - t % 10) % 10 === +c[17]; }
+  // Devuelve { fuente, nombre, rfc, regimen, cp } (campos vacíos si no se detectan)
+  function leerDocumentoProveedor(file) {
+    if (/\.xml$/i.test(file.name) || /xml/.test(file.type)) return file.text().then(function (x) { var r = parseXmlProveedor(x); if (!r) throw new Error('El XML no es un CFDI válido.'); return r; });
+    if (/\.pdf$/i.test(file.name) || /pdf/.test(file.type)) return pdfText(file).then(function (t) { if (!t.trim()) throw new Error('El PDF no tiene texto (¿es escaneado?). Captura los datos a mano.'); return parsePdfProveedor(t); });
+    return Promise.reject(new Error('Sube un XML o PDF.'));
+  }
+
   global.OC = {
     CAT: CAT, EMPRESAS: EMPRESAS, ESTADOS: ESTADOS, ESTADO_LABEL: ESTADO_LABEL, LEYENDA: LEYENDA, FORMATO: FORMATO,
     num: num, r2: r2, money: money, pct: pct, fmtDate: fmtDate, addDays: addDays, todayISO: todayISO, esc: esc,
     letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas,
-    calcular: calcular, maskClabe: maskClabe, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs
+    calcular: calcular, maskClabe: maskClabe, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
+    leerDocumentoProveedor: leerDocumentoProveedor, parsePdfProveedor: parsePdfProveedor, parseXmlProveedor: parseXmlProveedor, regimenPorCodigo: regimenPorCodigo, BANCOS: BANCOS, clabeValid: clabeValid
   };
 })(window);

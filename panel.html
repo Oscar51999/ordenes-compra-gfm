@@ -33,11 +33,29 @@
   .flag { font-size: 10.5px; font-weight: 600; color: var(--critical); margin-left: 6px; }
   .empty { text-align: center; color: var(--ink-soft); padding: 28px 0; font-size: 13.5px; }
   .drawer-bg { position: fixed; inset: 0; background: rgba(20,18,15,.45); z-index: 30; }
-  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: var(--paper); z-index: 31; overflow-y: auto; box-shadow: -10px 0 30px rgba(0,0,0,.2); }
-  .drawer-head { position: sticky; top: 0; background: linear-gradient(120deg, #431407, #9A3412); color: #fff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 4px solid #E7C9A0; z-index: 2; }
+  .drawer { position: fixed; top: 3vh; left: 50%; transform: translateX(-50%); bottom: 3vh; width: min(980px, calc(100% - 24px)); background: var(--paper); z-index: 31; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.35); border-radius: 14px; display: flex; flex-direction: column; }
+  @media (max-width: 600px) { .drawer { top: 0; bottom: 0; width: 100%; border-radius: 0; } }
+  .decision { position: sticky; bottom: 0; background: var(--surface); border-top: 3px solid var(--c1); padding: 12px 18px; display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: center; z-index: 2; box-shadow: 0 -6px 18px rgba(0,0,0,.08); }
+  .decision input { background: var(--paper); padding: 10px 12px; }
+  .decision .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .decision .btn { padding: 11px 16px; }
+  .btn.pend { background: #B7791F; color: #fff; } .btn.pend:hover { background: #975A16; }
+  .btn.is-on { outline: 3px solid color-mix(in srgb, var(--ink) 25%, transparent); outline-offset: 2px; }
+  @media (max-width: 700px) { .decision { grid-template-columns: 1fr; } .decision .btns .btn { flex: 1; justify-content: center; } }
+  .tk-head { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+  .tk-total { font-family: 'Roboto Mono', monospace; font-size: 26px; font-weight: 600; color: var(--c1); }
+  .modal .card.wide { width: min(760px, 100%); max-height: 94vh; overflow-y: auto; }
+  .drop { position: relative; border: 1.5px dashed var(--border); border-radius: 10px; background: var(--paper); padding: 14px; cursor: pointer; display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .drop:hover, .drop.drag { border-color: var(--c1); background: color-mix(in srgb, var(--c1) 6%, var(--surface)); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .drop .ico { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; font-family: 'Roboto Mono', monospace; font-size: 10.5px; font-weight: 600; color: #fff; background: var(--c1); }
+  .drop .txt { font-size: 12.5px; line-height: 1.4; } .drop .txt strong { display: block; font-size: 13.5px; }
+  .drop.sm { padding: 10px 12px; margin-bottom: 0; } .drop.sm .ico { width: 32px; height: 32px; background: var(--c2); }
+  .drop.has-file { border-style: solid; border-color: color-mix(in srgb, var(--success) 55%, var(--border)); }
+  .drawer-head { position: sticky; top: 0; border-radius: 14px 14px 0 0; background: linear-gradient(120deg, #431407, #9A3412); color: #fff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 4px solid #E7C9A0; z-index: 2; }
   .drawer-head .f { font-family: 'Roboto Mono', monospace; font-size: 18px; font-weight: 600; }
   .drawer-head button { background: transparent; border: 1px solid rgba(255,255,255,.4); color: #fff; border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
-  .drawer-body { padding: 16px 18px 40px; }
+  .drawer-body { padding: 16px 18px 20px; flex: 1; }
   .drawer .card { padding: 16px 18px; }
   .kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 12.5px; }
   @media (max-width: 600px) { .kv { grid-template-columns: 1fr 1fr; } }
@@ -78,6 +96,7 @@
       <div class="acts">
         <button class="btn ghost sm" id="b-refresh" type="button">↻ Actualizar</button>
         <button class="btn ghost sm" id="b-xlsx" type="button">⬇ Exportar Excel</button>
+        <button class="btn ghost sm" id="b-prov" type="button">＋ Alta de proveedor</button>
         <a class="btn sm" href="index.html" target="_blank" rel="noopener">+ Nueva orden</a>
       </div>
     </div>
@@ -96,7 +115,45 @@
 <aside class="drawer" id="drawer" hidden aria-label="Detalle de la orden">
   <div class="drawer-head"><span class="f" id="d-folio"></span><span id="d-badge"></span><button type="button" id="d-close">Cerrar ✕</button></div>
   <div class="drawer-body" id="d-body"></div>
+  <div class="decision" id="d-decision">
+    <input type="text" id="d-com" placeholder="Comentario para el solicitante (obligatorio si rechazas)">
+    <div class="btns">
+      <button class="btn ok" id="d-ok" type="button">✓ Aceptar</button>
+      <button class="btn pend" id="d-pend" type="button">⏸ Pendiente</button>
+      <button class="btn danger" id="d-no" type="button">✕ Rechazar</button>
+    </div>
+  </div>
 </aside>
+
+<div class="modal" id="prov-modal" hidden>
+  <div class="card wide">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 class="section-title" style="margin:0">Alta de proveedor</h2><button class="btn ghost sm" id="p-close" type="button">Cerrar ✕</button></div>
+    <p class="section-hint" style="margin-top:6px">Sube el CFDI (XML o PDF) o la constancia de situación fiscal para llenar los datos, o captúralos a mano.</p>
+    <label class="drop" id="p-drop"><input type="file" id="p-file" accept=".xml,.pdf,application/pdf,text/xml,application/xml"><span class="ico">XML<br>PDF</span><span class="txt"><strong>Llenar con CFDI o constancia fiscal</strong><span id="p-file-txt">Toca o arrastra el XML o PDF</span></span></label>
+    <p class="note" id="p-read" hidden></p>
+    <div class="row2">
+      <div class="field"><label for="p-nombre">Nombre o razón social</label><input type="text" id="p-nombre"></div>
+      <div class="field"><label for="p-rfc">RFC</label><input type="text" id="p-rfc" class="mono" maxlength="13"><p class="hint" id="p-rfc-hint"></p></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label for="p-regimen">Régimen fiscal</label><select id="p-regimen"></select></div>
+      <div class="field"><label for="p-cp">C.P. fiscal</label><input type="text" id="p-cp" class="mono" maxlength="5" inputmode="numeric"></div>
+      <div class="field"><label for="p-tel">Teléfono</label><input type="text" id="p-tel" inputmode="tel"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label for="p-clabe">CLABE / cuenta</label><input type="text" id="p-clabe" class="mono" maxlength="18" inputmode="numeric"><p class="hint" id="p-clabe-hint"></p></div>
+      <div class="field"><label for="p-banco">Banco</label><input type="text" id="p-banco" placeholder="Se detecta con la CLABE"></div>
+      <div class="field"><label for="p-correo">Correo</label><input type="email" id="p-correo"></div>
+    </div>
+    <div class="field"><label for="p-obs">Observaciones <span class="opt">(opcional)</span></label><input type="text" id="p-obs"></div>
+    <div class="row2" style="margin-bottom:14px">
+      <label class="drop sm" id="p-car"><input type="file" accept="application/pdf,image/*"><span class="ico">PDF</span><span class="txt"><strong>Carátula bancaria</strong><span>Opcional</span></span></label>
+      <label class="drop sm" id="p-csf"><input type="file" accept="application/pdf,image/*"><span class="ico">PDF</span><span class="txt"><strong>Constancia fiscal</strong><span>Opcional</span></span></label>
+    </div>
+    <p class="error-msg" id="p-err"></p>
+    <div class="acts"><button class="btn" id="p-save" type="button">Guardar proveedor</button><span class="hint" style="margin:0;align-self:center">Queda disponible en el formulario al instante.</span></div>
+  </div>
+</div>
 
 <div class="modal" id="send-modal" hidden>
   <div class="card">
@@ -119,7 +176,7 @@
   var POLL_MS = 30000;
   var O = window.OC, esc = O.esc, money = O.money;
   function $(id) { return document.getElementById(id); }
-  var KEY = '', all = [], current = null, kpiFilter = '', timer = null;
+  var KEY = '', all = [], provs = [], current = null, kpiFilter = '', timer = null;
 
   O.ESTADOS.forEach(function (e) { $('f-estado').insertAdjacentHTML('beforeend', '<option value="' + e.id + '">' + e.l + '</option>'); });
   O.EMPRESAS.forEach(function (e) { $('f-empresa').insertAdjacentHTML('beforeend', '<option>' + esc(e.nombre) + '</option>'); });
@@ -150,6 +207,7 @@
   function load() {
     return api({ action: 'list' }).then(function (d) {
       if (!d.ok) throw new Error(d.error);
+      provs = d.proveedores || [];
       all = (d.items || []).sort(function (a, b) { return String(b.folio).localeCompare(String(a.folio)); });
       $('conn').textContent = 'Conectado · ' + all.length + ' órdenes · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
       render();
@@ -166,7 +224,7 @@
   function totMXN(r) { return O.num(r.totalMXN || r.total); }
 
   var KPIS = [
-    { id: 'por_autorizar', l: 'Por autorizar', f: function (r) { return r.estado === 'por_autorizar'; } },
+    { id: 'por_autorizar', l: 'Pendientes', f: function (r) { return r.estado === 'por_autorizar'; } },
     { id: 'autorizada', l: 'Autorizadas sin enviar', f: function (r) { return r.estado === 'autorizada'; } },
     { id: 'transito', l: 'Enviadas / recibidas', f: function (r) { return r.estado === 'enviada' || r.estado === 'recibida'; } },
     { id: 'facturada', l: 'Facturadas por pagar', f: function (r) { return r.estado === 'facturada'; } },
@@ -212,6 +270,7 @@
     var tot = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + money(Math.abs(x[1]), mon) + '</span></div>'; }).join('') + '<div class="tot-line grand"><span>Total</span><span>' + money(t.total, mon) + '</span></div>';
     var clabe = String(r.provClabe || '').replace(/\D/g, '');
     $('d-body').innerHTML =
+      '<div class="card"><div class="tk-head"><div><div class="hint" style="margin:0">' + esc(r.empresa) + ' · ' + O.fmtDate(r.fecha) + '</div><div style="font-weight:700;font-size:17px;margin-top:2px">' + esc(r.provNombre) + '</div><div class="hint" style="margin:2px 0 0">Solicita ' + esc(r.solicitante) + ' · Autoriza ' + esc(r.autoriza) + (r.reqFolio ? ' · ' + esc(r.reqFolio) : '') + '</div></div><div style="text-align:right"><div class="hint" style="margin:0">Total</div><div class="tk-total">' + money(t.total, mon) + '</div></div></div></div>' +
       (vencida(r) ? '<p class="note warn">El pago estimado (' + O.fmtDate(r.fechaPagoEstimada) + ') ya venció.</p>' : '') +
       (nuevoPend(r) ? '<p class="note warn">Proveedor nuevo #' + esc(r.provNum) + ': valida sus datos en la pestaña Proveedores de la hoja.</p>' : '') +
       '<div class="card"><p class="sub-title section-title" style="font-size:16px">Acciones</p><div class="acts">' +
@@ -221,13 +280,6 @@
         (r.carpetaUrl ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(r.carpetaUrl) + '">Carpeta Drive</a>' : '') +
         (r.pdfUrl ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(r.pdfUrl) + '">PDF enviado</a>' : '') +
       '</div>' + (adj ? '<div class="acts" style="margin-top:10px">' + adj + '</div>' : '') + '</div>' +
-      '<div class="card"><p class="section-title" style="font-size:16px">Seguimiento</p>' +
-        '<div class="row2"><div class="field"><label for="e-estado">Estado</label><select id="e-estado">' + O.ESTADOS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === r.estado ? ' selected' : '') + '>' + e.l + '</option>'; }).join('') + '</select></div>' +
-        '<div class="field"><label for="e-com">Comentario <span class="opt">(se envía al solicitante)</span></label><input type="text" id="e-com" value="' + esc(r.comentarioAdmin) + '"></div></div>' +
-        '<div class="row3"><div class="field"><label for="e-fact">Factura (serie-folio / UUID)</label><input type="text" id="e-fact" value="' + esc(r.facturaRef) + '"></div>' +
-        '<div class="field"><label for="e-fpago">Fecha de pago</label><input type="date" id="e-fpago" value="' + esc(String(r.fechaPago || '').slice(0, 10)) + '"></div>' +
-        '<div class="field"><label for="e-pcorreo">Correo proveedor</label><input type="email" id="e-pcorreo" value="' + esc(r.provCorreo) + '"></div></div>' +
-        '<button class="btn sm" id="e-save" type="button">Guardar cambios</button></div>' +
       '<div class="card"><p class="section-title" style="font-size:16px">Orden</p>' + kv([
         ['Fecha', O.fmtDate(r.fecha)], ['Tipo', r.tipoOC], ['Requisición', r.reqFolio || 'N/A'],
         ['Solicita', r.solicitante + ' · ' + r.correoSolicitante], ['Autoriza', r.autoriza + ' · ' + r.correoAutoriza], ['Autorizó', r.autorizadoPor ? r.autorizadoPor + ' · ' + r.fechaAutorizacion : '—'],
@@ -242,7 +294,14 @@
       '<div class="card"><p class="section-title" style="font-size:16px">Partidas</p><div class="tbl"><table><tr><th>Cant.</th><th>Descripción</th><th>Insumo</th><th>Obra</th><th>IVA</th><th class="r">P.U.</th><th class="r">Subtotal</th></tr>' +
         (r.items || []).map(function (it) { return '<tr><td>' + esc(it.cantidad) + ' ' + esc(it.unidad) + '</td><td class="wrap">' + esc(it.descripcion) + '</td><td class="wrap">' + esc(it.partida) + '</td><td class="wrap">' + esc(it.obra) + '</td><td>' + (it.tasaIva === 'EXENTO' ? 'Exento' : O.num(it.tasaIva) * 100 + '%') + '</td><td class="r">' + money(it.precioUnitario, mon) + '</td><td class="r">' + money(O.num(it.cantidad) * O.num(it.precioUnitario), mon) + '</td></tr>'; }).join('') +
         '</table></div><div class="totals" style="margin-top:12px"><p class="hint">' + esc(r.observaciones || '') + '</p><div><div class="tot-box">' + tot + '</div><p class="letra"><b>' + esc(O.letras(t.total, mon)) + '</b></p></div></div></div>' +
-      '<div class="card"><p class="section-title" style="font-size:16px">Historial</p><ul class="hist">' + (r.historial || []).slice().reverse().map(function (h) { return '<li><span class="when">' + esc(String(h.f || '').replace('T', ' ').slice(0, 16)) + '</span> · ' + badge(h.e) + ' · <b>' + esc(h.u) + '</b>' + (h.c ? '<br>' + esc(h.c) : '') + '</li>'; }).join('') + '</ul></div>';
+      '<div class="card"><p class="section-title" style="font-size:16px">Seguimiento de compra y pago</p><p class="hint" style="margin:-2px 0 12px">Para aceptar, rechazar o dejar pendiente usa los botones de abajo.</p>' +
+        '<div class="row2"><div class="field"><label for="e-estado">Estado</label><select id="e-estado">' + O.ESTADOS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === r.estado ? ' selected' : '') + '>' + e.l + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="e-com">Comentario <span class="opt">(se envía al solicitante)</span></label><input type="text" id="e-com" value="' + esc(r.comentarioAdmin) + '"></div></div>' +
+        '<div class="row3"><div class="field"><label for="e-fact">Factura (serie-folio / UUID)</label><input type="text" id="e-fact" value="' + esc(r.facturaRef) + '"></div>' +
+        '<div class="field"><label for="e-fpago">Fecha de pago</label><input type="date" id="e-fpago" value="' + esc(String(r.fechaPago || '').slice(0, 10)) + '"></div>' +
+        '<div class="field"><label for="e-pcorreo">Correo proveedor</label><input type="email" id="e-pcorreo" value="' + esc(r.provCorreo) + '"></div></div>' +
+        '<button class="btn sm" id="e-save" type="button">Guardar cambios</button></div>' +
+      '<div class="card"><p class="section-title" style="font-size:16px">Historial</p><ul class="hist">' + (r.historial || []).slice().reverse().map(function (h) { return '<li><span class="when">' + esc(h.f ? new Date(h.f).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '') + '</span> · ' + badge(h.e) + ' · <b>' + esc(h.u) + '</b>' + (h.c ? '<br>' + esc(h.c) : '') + '</li>'; }).join('') + '</ul></div>';
 
     $('a-pdf').onclick = function () { busy(true, 'Generando PDF…'); O.buildPdf(r, { clabeCompleta: true }).then(function (doc) { doc.save(r.folio + '_FO-GF-02.pdf'); }).catch(function () { toast('No se pudo generar el PDF'); }).then(function () { busy(false); }); };
     if ($('a-send')) $('a-send').onclick = function () { $('s-to').value = r.provCorreo || ''; $('s-msg').value = ''; $('s-err').classList.remove('show'); $('send-modal').hidden = false; $('s-to').focus(); };
@@ -256,10 +315,30 @@
         if (!d.ok) throw new Error(d.error); toast('Guardado' + (campos.estado !== r.estado ? ' · se avisó al solicitante' : '')); return load();
       }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); });
     };
+    var avanzada = ['enviada', 'recibida', 'facturada', 'pagada', 'cancelada'].indexOf(r.estado) >= 0;
+    $('d-com').value = '';
+    $('d-com').placeholder = avanzada ? 'La orden ya está ' + (O.ESTADO_LABEL[r.estado] || '').toLowerCase() + '; cambiarla aquí la regresa a decisión' : 'Comentario para el solicitante (obligatorio si rechazas)';
+    $('d-ok').classList.toggle('is-on', r.estado === 'autorizada');
+    $('d-pend').classList.toggle('is-on', r.estado === 'por_autorizar');
+    $('d-no').classList.toggle('is-on', r.estado === 'rechazada');
   }
+  function decidir(estado) {
+    var r = current; if (!r) return;
+    var com = $('d-com').value.trim();
+    if (estado === 'rechazada' && !com) { toast('Escribe el motivo del rechazo'); $('d-com').focus(); return; }
+    if (estado === r.estado && !com) { toast('La orden ya está ' + O.ESTADO_LABEL[estado].toLowerCase()); return; }
+    busy(true, 'Guardando…');
+    post({ accion: 'actualizar', folio: r.folio, campos: { estado: estado, comentarioAdmin: com }, usuario: 'Panel Compras' }).then(function (d) {
+      if (!d.ok) throw new Error(d.error);
+      toast(O.ESTADO_LABEL[estado] + ' · se avisó a ' + r.solicitante); return load();
+    }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); });
+  }
+  $('d-ok').onclick = function () { decidir('autorizada'); };
+  $('d-pend').onclick = function () { decidir('por_autorizar'); };
+  $('d-no').onclick = function () { decidir('rechazada'); };
   function closeDetail() { $('drawer').hidden = $('drawer-bg').hidden = true; current = null; }
   $('d-close').onclick = closeDetail; $('drawer-bg').onclick = closeDetail;
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('send-modal').hidden) $('send-modal').hidden = true; else closeDetail(); } });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('send-modal').hidden) $('send-modal').hidden = true; else if (!$('prov-modal').hidden) $('prov-modal').hidden = true; else closeDetail(); } });
 
   $('s-cancel').onclick = function () { $('send-modal').hidden = true; };
   $('s-go').onclick = function () {
@@ -272,6 +351,84 @@
     }).then(function (d) { if (!d.ok) throw new Error(d.error); toast('Orden enviada a ' + to); return load(); })
       .catch(function (x) { toast('No se envió: ' + (x.message || x)); }).then(function () { busy(false); });
   };
+
+  // ---------- alta de proveedor ----------
+  var pFiles = { CARATULA: null, CSF: null, ORIGEN: null };
+  $('p-regimen').innerHTML = '<option value="">Selecciona</option>' + O.CAT.regimenes.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('');
+  function pReset() {
+    ['p-nombre', 'p-rfc', 'p-cp', 'p-tel', 'p-clabe', 'p-banco', 'p-correo', 'p-obs'].forEach(function (id) { $(id).value = ''; });
+    $('p-regimen').value = ''; $('p-read').hidden = true; $('p-err').classList.remove('show'); $('p-rfc-hint').textContent = ''; $('p-clabe-hint').textContent = '';
+    pFiles = { CARATULA: null, CSF: null, ORIGEN: null };
+    ['p-drop', 'p-car', 'p-csf'].forEach(function (id) { $(id).classList.remove('has-file'); });
+    $('p-file-txt').textContent = 'Toca o arrastra el XML o PDF';
+    $('p-car').querySelector('.txt span').textContent = 'Opcional'; $('p-csf').querySelector('.txt span').textContent = 'Opcional';
+  }
+  $('b-prov').onclick = function () { pReset(); $('prov-modal').hidden = false; };
+  $('p-close').onclick = function () { $('prov-modal').hidden = true; };
+  function rfcCheck() {
+    var v = $('p-rfc').value = $('p-rfc').value.toUpperCase().replace(/[^A-ZÑ&0-9]/g, '');
+    var h = $('p-rfc-hint'); if (!v) { h.textContent = ''; return; }
+    var ok = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(v);
+    var dup = provs.filter(function (p) { return String(p.rfc).toUpperCase() === v; })[0];
+    h.textContent = !ok ? 'Formato de RFC inválido' : dup ? 'Ya existe: #' + dup.num + ' ' + dup.nombre : (v.length === 13 ? 'Persona física' : 'Persona moral');
+    h.className = 'hint ' + (!ok || dup ? 'bad' : 'ok');
+  }
+  $('p-rfc').addEventListener('input', rfcCheck);
+  $('p-clabe').addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 18); var v = this.value, h = $('p-clabe-hint');
+    if (v.length < 18) { h.textContent = v ? v.length + ' dígitos' : ''; h.className = 'hint'; return; }
+    var ok = O.clabeValid(v); h.textContent = ok ? 'CLABE válida' : 'Dígito verificador incorrecto'; h.className = 'hint ' + (ok ? 'ok' : 'bad');
+    if (ok && O.BANCOS[v.slice(0, 3)] && !$('p-banco').value) $('p-banco').value = O.BANCOS[v.slice(0, 3)];
+  });
+  function readAsDataURL(f) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(f); }); }
+  function bindDrop(lab, cb) {
+    var inp = lab.querySelector('input');
+    inp.addEventListener('change', function () { if (this.files[0]) cb(this.files[0]); this.value = ''; });
+    lab.addEventListener('dragover', function (e) { e.preventDefault(); lab.classList.add('drag'); });
+    lab.addEventListener('dragleave', function () { lab.classList.remove('drag'); });
+    lab.addEventListener('drop', function (e) { e.preventDefault(); lab.classList.remove('drag'); var f = (e.dataTransfer.files || [])[0]; if (f) cb(f); });
+  }
+  bindDrop($('p-drop'), function (f) {
+    $('p-file-txt').textContent = 'Leyendo ' + f.name + '…';
+    O.leerDocumentoProveedor(f).then(function (d) {
+      var got = [];
+      if (d.nombre) { $('p-nombre').value = d.nombre; got.push('nombre'); }
+      if (d.rfc) { $('p-rfc').value = d.rfc; got.push('RFC'); rfcCheck(); }
+      if (d.regimen) { $('p-regimen').value = d.regimen; got.push('régimen'); }
+      if (d.cp) { $('p-cp').value = d.cp; got.push('C.P.'); }
+      $('p-drop').classList.add('has-file'); $('p-file-txt').textContent = f.name;
+      var n = $('p-read'); n.hidden = false;
+      n.className = 'note ' + (got.length >= 3 ? 'ok' : 'warn');
+      n.textContent = got.length ? 'Leído de ' + d.fuente + ': ' + got.join(', ') + '. Revisa y completa lo que falte.' : 'No se pudieron leer datos de este archivo. Captúralos a mano.';
+      readAsDataURL(f).then(function (u) { pFiles.ORIGEN = { nombre: f.name, tipo: /CONSTANCIA/i.test(d.fuente) ? 'CSF' : 'CFDI', data: u }; });
+    }).catch(function (x) { $('p-file-txt').textContent = 'Toca o arrastra el XML o PDF'; var n = $('p-read'); n.hidden = false; n.className = 'note warn'; n.textContent = x.message || 'No se pudo leer el archivo.'; });
+  });
+  [['p-car', 'CARATULA'], ['p-csf', 'CSF']].forEach(function (x) {
+    bindDrop($(x[0]), function (f) {
+      if (f.size > 8 * 1024 * 1024) { toast('El archivo pesa más de 8 MB'); return; }
+      readAsDataURL(f).then(function (u) { pFiles[x[1]] = { nombre: f.name, tipo: x[1], data: u }; $(x[0]).classList.add('has-file'); $(x[0]).querySelector('.txt span').textContent = f.name; });
+    });
+  });
+  function pErr(m, el) { $('p-err').textContent = m; $('p-err').classList.add('show'); if (el) el.focus(); }
+  function guardarProv(forzar) {
+    $('p-err').classList.remove('show');
+    var prov = { nombre: $('p-nombre').value.trim(), rfc: $('p-rfc').value.trim(), regimen: $('p-regimen').value, cp: $('p-cp').value.trim(), telefono: $('p-tel').value.trim(), clabe: $('p-clabe').value.trim(), banco: $('p-banco').value.trim(), correo: $('p-correo').value.trim(), obs: $('p-obs').value.trim() };
+    if (!prov.nombre) return pErr('Escribe el nombre o razón social.', $('p-nombre'));
+    if (prov.rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(prov.rfc)) return pErr('El RFC no es válido.', $('p-rfc'));
+    if (!prov.regimen) return pErr('Selecciona el régimen fiscal.', $('p-regimen'));
+    if (prov.clabe.length === 18 && !O.clabeValid(prov.clabe)) return pErr('La CLABE no es válida.', $('p-clabe'));
+    if (prov.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prov.correo)) return pErr('El correo no es válido.', $('p-correo'));
+    var archivos = [pFiles.ORIGEN, pFiles.CARATULA, pFiles.CSF].filter(Boolean);
+    busy(true, 'Guardando proveedor…');
+    post({ accion: 'altaProveedor', prov: prov, archivos: archivos, forzar: !!forzar }).then(function (d) {
+      if (!d.ok && d.duplicado) { pErr(d.error + ' Si de todos modos es otro registro, da clic en "Guardar proveedor" otra vez.'); $('p-save').dataset.forzar = '1'; return; }
+      if (!d.ok) throw new Error(d.error);
+      $('prov-modal').hidden = true; $('p-save').dataset.forzar = '';
+      toast('Proveedor #' + d.num + ' ' + prov.nombre.toUpperCase() + ' dado de alta'); load();
+    }).catch(function (x) { pErr('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); });
+  }
+  $('p-save').onclick = function () { guardarProv(this.dataset.forzar === '1'); };
+  ['p-rfc', 'p-nombre'].forEach(function (id) { $(id).addEventListener('input', function () { $('p-save').dataset.forzar = ''; }); });
 
   // ---------- Excel ----------
   $('b-xlsx').onclick = function () {
