@@ -18,7 +18,9 @@
 
   CAT.tiposOC = ['NORMAL', 'URGENTE', 'CRÍTICO', 'OTROS'];
   CAT.servicios = ['Generales', 'Honorarios', 'Fletes', 'Arrendamiento'];
-  CAT.unidades = ['PZA', 'M3', 'M2', 'ML', 'KG', 'TON', 'LT', 'JGO', 'LOTE', 'SERV', 'VIAJE', 'HR', 'DÍA', 'MES', 'BULTO', 'ROLLO', 'CAJA'];
+  CAT.unidades = ['PZA', 'M', 'ML', 'M2', 'M3', 'KG', 'TON', 'G', 'LT', 'GAL', 'CUBETA', 'TAMBO', 'JGO', 'KIT', 'JUEGO', 'PAR', 'LOTE', 'SERV', 'ACT', 'EST', 'VIAJE', 'HR', 'DÍA', 'SEM', 'MES', 'BULTO', 'SACO', 'ROLLO', 'CAJA', 'PAQ', 'TRAMO', 'HOJA', 'PLIEGO', 'TABLA', 'VARILLA', 'CIENTO', 'MILLAR', 'TONELADA-KM', 'M3-KM', 'GLOBAL'];
+  // Centros de costos por empresa. Vacío = la empresa ve todos. Llenar con la relación que mande Finanzas.
+  CAT.ccPorEmpresa = {};
   CAT.formasPago = ['03 - Transferencia electrónica de fondos', '01 - Efectivo', '02 - Cheque nominativo', '04 - Tarjeta de crédito', '28 - Tarjeta de débito', '99 - Por definir'];
   CAT.metodosPago = ['PUE - Pago en una sola exhibición', 'PPD - Pago en parcialidades o diferido'];
   CAT.usosCfdi = ['G01 - Adquisición de mercancías', 'G02 - Devoluciones, descuentos o bonificaciones', 'G03 - Gastos en general', 'I01 - Construcciones', 'I02 - Mobiliario y equipo de oficina por inversiones', 'I03 - Equipo de transporte', 'I04 - Equipo de cómputo y accesorios', 'I05 - Dados, troqueles, moldes, matrices y herramental', 'I06 - Comunicaciones telefónicas', 'I07 - Comunicaciones satelitales', 'I08 - Otra maquinaria y equipo', 'S01 - Sin efectos fiscales'];
@@ -131,6 +133,7 @@
     return { bruto: bruto, amort: amort, fondo: fondo, otras: otras, subtotal: subtotal, iva: iva, retIsr: retIsr, retIva: retIva, total: total, totalMXN: r2(total * (oc.moneda === 'DOLARES' ? tc : 1)) };
   }
 
+  function ccDeEmpresa(emp) { var l = CAT.ccPorEmpresa[emp]; return l && l.length ? l : null; }
   function maskClabe(c) { c = String(c || ''); return c.length > 4 ? '•••• ' + c.slice(-4) : c; }
 
   // ---------- PDF FO-GF-02 (jsPDF + autotable) ----------
@@ -384,7 +387,7 @@
     CAT: CAT, EMPRESAS: EMPRESAS, ESTADOS: ESTADOS, ESTADO_LABEL: ESTADO_LABEL, LEYENDA: LEYENDA, FORMATO: FORMATO,
     num: num, r2: r2, money: money, pct: pct, fmtDate: fmtDate, addDays: addDays, todayISO: todayISO, esc: esc,
     letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas,
-    calcular: calcular, maskClabe: maskClabe, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
+    calcular: calcular, maskClabe: maskClabe, ccDeEmpresa: ccDeEmpresa, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
     leerDocumentoProveedor: leerDocumentoProveedor, parsePdfProveedor: parsePdfProveedor, parseXmlProveedor: parseXmlProveedor, regimenPorCodigo: regimenPorCodigo, BANCOS: BANCOS, clabeValid: clabeValid
   };
 })(window);
