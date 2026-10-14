@@ -141,13 +141,13 @@
       <div class="field"><label for="p-tel">Teléfono</label><input type="text" id="p-tel" inputmode="tel"></div>
     </div>
     <div class="row3">
-      <div class="field"><label for="p-clabe">CLABE / cuenta</label><input type="text" id="p-clabe" class="mono" maxlength="18" inputmode="numeric"><p class="hint" id="p-clabe-hint"></p></div>
+      <div class="field"><label for="p-clabe">CLABE interbancaria *</label><input type="text" id="p-clabe" class="mono" maxlength="18" inputmode="numeric"><p class="hint" id="p-clabe-hint"></p></div>
       <div class="field"><label for="p-banco">Banco</label><input type="text" id="p-banco" placeholder="Se detecta con la CLABE"></div>
       <div class="field"><label for="p-correo">Correo</label><input type="email" id="p-correo"></div>
     </div>
     <div class="field"><label for="p-obs">Observaciones <span class="opt">(opcional)</span></label><input type="text" id="p-obs"></div>
     <div class="row2" style="margin-bottom:14px">
-      <label class="drop sm" id="p-car"><input type="file" accept="application/pdf,image/*"><span class="ico">PDF</span><span class="txt"><strong>Carátula bancaria</strong><span>Opcional</span></span></label>
+      <label class="drop sm" id="p-car"><input type="file" accept="application/pdf,image/*"><span class="ico">PDF</span><span class="txt"><strong>Carátula bancaria *</strong><span>Requisito</span></span></label>
       <label class="drop sm" id="p-csf"><input type="file" accept="application/pdf,image/*"><span class="ico">PDF</span><span class="txt"><strong>Constancia fiscal</strong><span>Opcional</span></span></label>
     </div>
     <p class="error-msg" id="p-err"></p>
@@ -293,7 +293,7 @@
       ]) + (r.enviadaA ? '<p class="hint">Enviada a: ' + esc(r.enviadaA) + '</p>' : '') + '</div>' +
       '<div class="card"><p class="section-title" style="font-size:16px">Partidas</p><div class="tbl"><table><tr><th>Cant.</th><th>Descripción</th><th>Insumo</th><th>Obra</th><th>IVA</th><th class="r">P.U.</th><th class="r">Subtotal</th></tr>' +
         (r.items || []).map(function (it) { return '<tr><td>' + esc(it.cantidad) + ' ' + esc(it.unidad) + '</td><td class="wrap">' + esc(it.descripcion) + '</td><td class="wrap">' + esc(it.partida) + '</td><td class="wrap">' + esc(it.obra) + '</td><td>' + (it.tasaIva === 'EXENTO' ? 'Exento' : O.num(it.tasaIva) * 100 + '%') + '</td><td class="r">' + money(it.precioUnitario, mon) + '</td><td class="r">' + money(O.num(it.cantidad) * O.num(it.precioUnitario), mon) + '</td></tr>'; }).join('') +
-        '</table></div><div class="totals" style="margin-top:12px"><p class="hint">' + esc(r.observaciones || '') + '</p><div><div class="tot-box">' + tot + '</div><p class="letra"><b>' + esc(O.letras(t.total, mon)) + '</b></p></div></div></div>' +
+        '</table></div><div class="totals" style="margin-top:12px"><p class="hint">' + (r.observaciones ? '<b>Solicitud de recurso / motivo:</b> ' + esc(r.observaciones) : '') + '</p><div><div class="tot-box">' + tot + '</div><p class="letra"><b>' + esc(O.letras(t.total, mon)) + '</b></p></div></div></div>' +
       '<div class="card"><p class="section-title" style="font-size:16px">Seguimiento de compra y pago</p><p class="hint" style="margin:-2px 0 12px">Para aceptar, rechazar o dejar pendiente usa los botones de abajo.</p>' +
         '<div class="row2"><div class="field"><label for="e-estado">Estado</label><select id="e-estado">' + O.ESTADOS.map(function (e) { return '<option value="' + e.id + '"' + (e.id === r.estado ? ' selected' : '') + '>' + e.l + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label for="e-com">Comentario <span class="opt">(se envía al solicitante)</span></label><input type="text" id="e-com" value="' + esc(r.comentarioAdmin) + '"></div></div>' +
@@ -406,7 +406,15 @@
   [['p-car', 'CARATULA'], ['p-csf', 'CSF']].forEach(function (x) {
     bindDrop($(x[0]), function (f) {
       if (f.size > 8 * 1024 * 1024) { toast('El archivo pesa más de 8 MB'); return; }
-      readAsDataURL(f).then(function (u) { pFiles[x[1]] = { nombre: f.name, tipo: x[1], data: u }; $(x[0]).classList.add('has-file'); $(x[0]).querySelector('.txt span').textContent = f.name; });
+      $(x[0]).querySelector('.txt span').textContent = f.name; $(x[0]).classList.add('has-file');
+      readAsDataURL(f).then(function (u) { pFiles[x[1]] = { nombre: f.name, tipo: x[1], data: u }; });
+      if (x[1] === 'CARATULA') O.leerCaratula(f).then(function (d) {
+        var got = [];
+        if (d.clabe && !$('p-clabe').value) { $('p-clabe').value = d.clabe; $('p-clabe').dispatchEvent(new Event('input')); got.push('CLABE'); }
+        if (d.banco && !$('p-banco').value) { $('p-banco').value = d.banco; got.push('banco'); }
+        if (d.titular && !$('p-nombre').value) { $('p-nombre').value = d.titular.toUpperCase(); got.push('nombre'); }
+        if (got.length) $(x[0]).querySelector('.txt span').textContent = f.name + ' · se llenó ' + got.join(', ');
+      });
     });
   });
   function pErr(m, el) { $('p-err').textContent = m; $('p-err').classList.add('show'); if (el) el.focus(); }
@@ -416,7 +424,8 @@
     if (!prov.nombre) return pErr('Escribe el nombre o razón social.', $('p-nombre'));
     if (prov.rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(prov.rfc)) return pErr('El RFC no es válido.', $('p-rfc'));
     if (!prov.regimen) return pErr('Selecciona el régimen fiscal.', $('p-regimen'));
-    if (prov.clabe.length === 18 && !O.clabeValid(prov.clabe)) return pErr('La CLABE no es válida.', $('p-clabe'));
+    if (!O.clabeValid(prov.clabe)) return pErr('Captura la CLABE interbancaria (18 dígitos válidos).', $('p-clabe'));
+    if (!pFiles.CARATULA) return pErr('Sube la carátula bancaria del proveedor.', $('p-car'));
     if (prov.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prov.correo)) return pErr('El correo no es válido.', $('p-correo'));
     var archivos = [pFiles.ORIGEN, pFiles.CARATULA, pFiles.CSF].filter(Boolean);
     busy(true, 'Guardando proveedor…');

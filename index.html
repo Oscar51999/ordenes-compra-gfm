@@ -19,6 +19,9 @@
   .sub-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15.5px; text-transform: uppercase; letter-spacing: .02em; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .ret-box { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-radius: 10px; padding: 12px 14px; background: color-mix(in srgb, var(--sc) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--border)); font-size: 13px; margin-bottom: 16px; }
   .ret-box b { font-family: 'Roboto Mono', monospace; }
+  .ret-edit { margin-top: 12px; }
+  .req { color: #C2410C; font-weight: 700; }
+  .drop.invalid { border-color: var(--critical, #C51315) !important; }
   .req-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 
   #items-wrap { display: flex; flex-direction: column; gap: 12px; }
@@ -109,7 +112,7 @@
     </div>
     <div class="row3">
       <div class="field"><label for="f-fecha">Fecha de la orden</label><input type="date" id="f-fecha" required></div>
-      <div class="field"><label for="f-frente">Frente <span class="opt">(opcional)</span></label><input type="text" id="f-frente"></div>
+      <div class="field"><label for="f-frente">Frente</label><input type="text" id="f-frente" required></div>
       <div class="field"><label for="f-estim">No. de estimación <span class="opt">(opcional)</span></label><input type="text" id="f-estim" placeholder="NA"></div>
     </div>
     <div class="field" style="margin-bottom:0">
@@ -143,11 +146,11 @@
         <div class="field"><label for="n-tel">Teléfono <span class="opt">(opcional)</span></label><input type="text" id="n-tel" inputmode="tel"></div>
       </div>
       <div class="row2">
-        <div class="field"><label for="n-clabe">CLABE interbancaria</label><input type="text" id="n-clabe" class="mono" inputmode="numeric" maxlength="18"><p class="hint" id="n-clabe-hint"></p></div>
+        <div class="field"><label for="n-clabe">CLABE interbancaria <span class="req">*</span></label><input type="text" id="n-clabe" class="mono" inputmode="numeric" maxlength="18"><p class="hint" id="n-clabe-hint"></p></div>
         <div class="field"><label for="n-banco">Banco</label><input type="text" id="n-banco" placeholder="Se detecta con la CLABE"></div>
       </div>
       <div class="row2">
-        <label class="drop field" id="drop-caratula"><input type="file" accept="application/pdf,image/*" data-tipo="CARATULA"><span class="ico">PDF</span><span class="txt"><strong>Carátula bancaria</strong><span>Toca o arrastra</span></span></label>
+        <label class="drop field" id="drop-caratula"><input type="file" accept="application/pdf,image/*" data-tipo="CARATULA"><span class="ico">PDF</span><span class="txt"><strong>Carátula bancaria <span class="req">*</span></strong><span>Requisito · toca o arrastra</span></span></label>
         <label class="drop field" id="drop-csf"><input type="file" accept="application/pdf,image/*" data-tipo="CSF"><span class="ico">PDF</span><span class="txt"><strong>Constancia de situación fiscal</strong><span>Toca o arrastra</span></span></label>
       </div>
     </div>
@@ -160,7 +163,12 @@
       <label>¿El proveedor emite factura?</label>
       <div class="seg" id="emite-seg"><button type="button" data-v="SI" aria-pressed="true">Sí, factura</button><button type="button" data-v="NO" aria-pressed="false">No factura</button></div>
     </div>
-    <div class="ret-box" id="ret-box"><span id="ret-motivo">Selecciona un proveedor para calcular retenciones.</span><span>ISR <b id="ret-isr">0 %</b> · IVA <b id="ret-iva">0 %</b></span></div>
+    <div class="ret-box" id="ret-box"><span id="ret-motivo">Selecciona un proveedor para calcular retenciones.</span><span>Sugerido por régimen: ISR <b id="ret-isr">0 %</b> · IVA <b id="ret-iva">0 %</b></span></div>
+    <div class="row2 ret-edit">
+      <div class="field"><label for="r-isr">Retención de ISR %</label><input type="text" id="r-isr" class="money" inputmode="decimal" value="0"></div>
+      <div class="field"><label for="r-iva">Retención de IVA %</label><input type="text" id="r-iva" class="money" inputmode="decimal" value="0"></div>
+    </div>
+    <p class="hint warn" id="ret-warn" hidden></p>
   </div>
 
   <!-- 3. Condiciones -->
@@ -202,7 +210,7 @@
     <h2 class="section-title"><span class="section-num">5</span>Resumen y envío</h2>
     <div class="totals">
       <div>
-        <div class="field"><label for="f-obs">Observaciones <span class="opt">(opcional)</span></label><textarea id="f-obs" placeholder="Condiciones de entrega, lugar, vigencia de la cotización…"></textarea></div>
+        <div class="field"><label for="f-obs">Solicitud de recurso / motivo</label><textarea id="f-obs" placeholder="Para qué se compra, condiciones de entrega, lugar, vigencia de la cotización…" required></textarea></div>
         <label class="drop" id="drop-cot"><input type="file" accept="application/pdf,image/*" multiple data-tipo="COTIZACION"><span class="ico">PDF</span><span class="txt"><strong>Cotización(es) del proveedor</strong><span>Opcional · PDF o foto</span></span></label>
         <div class="chips" id="cot-chips"></div>
       </div>
@@ -265,7 +273,13 @@
   opts($('n-regimen'), CAT.regimenes, 'Selecciona');
   $('tipo-group').innerHTML = CAT.tiposOC.map(function (t, i) { return '<label class="pill"><input type="radio" name="tipo" value="' + t + '"' + (i ? '' : ' checked') + '><span class="dot"></span>' + t.charAt(0) + t.slice(1).toLowerCase() + '</label>'; }).join('');
   $('f-fecha').value = O.todayISO();
-  if (O.EMPRESAS.length) $('f-empresa').value = O.EMPRESAS[0].nombre;
+  function fillCc() {
+    var lista = O.ccDeEmpresa($('f-empresa').value) || CAT.cc, cur = $('f-cc').value;
+    opts($('f-cc'), lista, $('f-empresa').value ? 'Selecciona el centro de costos' : 'Primero selecciona la empresa');
+    if (cur && lista.indexOf(cur) >= 0) $('f-cc').value = cur;
+  }
+  $('f-empresa').addEventListener('change', fillCc);
+  fillCc();
   try { var me = JSON.parse(localStorage.getItem('gfm_oc_me') || '{}'); ['solicitante', 'correo', 'autoriza', 'correo-aut'].forEach(function (k) { if (me[k]) $('f-' + k).value = me[k]; }); } catch (e) {}
 
   // ---- proveedores ----
@@ -354,8 +368,20 @@
     else if (!p || (!p.regimen && !p.rfc)) { ret = { isr: 0, iva: 0 }; $('ret-motivo').textContent = 'Selecciona un proveedor para calcular retenciones.'; }
     else { var s = O.retencionesSugeridas(p.regimen, p.rfc, $('f-servicio').value); ret = s; $('ret-motivo').textContent = s.motivo + '.'; }
     $('ret-isr').textContent = O.pct(ret.isr); $('ret-iva').textContent = O.pct(ret.iva);
-    recalc();
+    $('r-isr').value = fmtPct(ret.isr); $('r-iva').value = fmtPct(ret.iva);
+    var off = state.emite === 'NO'; $('r-isr').disabled = off; $('r-iva').disabled = off;
+    chkRet(); recalc();
   }
+  function fmtPct(x) { var v = Math.round(num(x) * 10000) / 100; return String(v); }
+  function retCaptured() { return { isr: num($('r-isr').value) / 100, iva: num($('r-iva').value) / 100 }; }
+  function chkRet() {
+    var c = retCaptured(), w = $('ret-warn');
+    var dif = Math.abs(c.isr - ret.isr) > 0.00005 || Math.abs(c.iva - ret.iva) > 0.00005;
+    w.hidden = !dif || state.emite === 'NO';
+    w.textContent = 'Las retenciones capturadas no coinciden con el régimen del proveedor (' + ($('ret-motivo').textContent || '').replace(/\.$/, '') + '). Verifícalo antes de enviar; se marcará en la orden.';
+    return !dif;
+  }
+  ['r-isr', 'r-iva'].forEach(function (id) { $(id).addEventListener('input', function () { this.value = this.value.replace(/[^0-9.]/g, ''); chkRet(); recalc(); }); });
 
   // ---- condiciones ----
   function updPago() {
@@ -377,7 +403,7 @@
     var obraDef = pre.obra || ($('f-cc').value && CAT.obras.indexOf($('f-cc').value) >= 0 ? $('f-cc').value : '');
     row.innerHTML =
       '<div class="item-head"><span class="item-num"></span><button type="button" class="item-remove">Quitar</button></div>' +
-      '<div class="ig1"><div class="field"><label>Obra</label><select class="i-obra">' + '<option value="">Misma del centro de costos</option>' + CAT.obras.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="ig1"><div class="field"><label>Obra</label><select class="i-obra">' + '<option value="">Misma del centro de costos</option>' + (O.obrasDeEmpresa($('f-empresa').value) || CAT.obras).map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label>Insumo</label><select class="i-partida"><option value="" disabled selected>Selecciona</option>' + CAT.partidas.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="ig2"><div class="field"><label>Cantidad</label><input type="text" class="i-cant money" inputmode="decimal"></div>' +
       '<div class="field"><label>Unidad</label><select class="i-unidad">' + CAT.unidades.map(function (u) { return '<option>' + u + '</option>'; }).join('') + '</select></div>' +
@@ -423,7 +449,7 @@
       diasCredito: +$('f-dias').value, fechaPagoEstimada: $('f-fecha').value ? O.addDays($('f-fecha').value, +$('f-dias').value) : '',
       moneda: $('f-moneda').value, tipoCambio: num($('f-tc').value) || 1,
       pctAnticipo: num($('p-anticipo').value) / 100, pctFondo: num($('p-fondo').value) / 100, pctOtras: num($('p-otras').value) / 100,
-      retIsrPct: ret.isr, retIvaPct: ret.iva, items: itemsData(), observaciones: $('f-obs').value.trim()
+      retIsrPct: state.emite === 'NO' ? 0 : retCaptured().isr, retIvaPct: state.emite === 'NO' ? 0 : retCaptured().iva, retSugIsr: ret.isr, retSugIva: ret.iva, retManual: chkRet() ? 'NO' : 'SI', items: itemsData(), observaciones: $('f-obs').value.trim()
     };
   }
   function recalc() {
@@ -499,9 +525,18 @@
       if (/CONSTANCIA/i.test(d.fuente) && !state.files.CSF) { var e = prepFile(f, 'CSF'); if (e) { state.files.CSF = e; $('drop-csf').classList.add('has-file'); $('drop-csf').querySelector('.txt span').textContent = e.nombre; } }
     }).catch(function (x) { $('cfdi-txt').textContent = x.message || 'No se pudo leer el archivo.'; });
   });
+  function autoBanco(f, lab) {
+    O.leerCaratula(f).then(function (d) {
+      var got = [];
+      if (d.clabe && !$('n-clabe').value) { $('n-clabe').value = d.clabe; $('n-clabe').dispatchEvent(new Event('input')); got.push('CLABE'); }
+      if (d.banco && !$('n-banco').value) { $('n-banco').value = d.banco; got.push('banco'); }
+      if (d.titular && !$('n-nombre').value) { $('n-nombre').value = d.titular.toUpperCase(); got.push('nombre'); }
+      if (got.length) lab.querySelector('.txt span').textContent = f.name + ' · se llenó ' + got.join(', ');
+    });
+  }
   ['drop-caratula', 'drop-csf'].forEach(function (id) {
     var lab = $(id), tipo = lab.querySelector('input').dataset.tipo;
-    bindDrop(lab, function (fs) { var e = prepFile(fs[0], tipo); if (!e) return; state.files[tipo] = e; lab.classList.add('has-file'); lab.querySelector('.txt span').textContent = e.nombre; });
+    bindDrop(lab, function (fs) { var e = prepFile(fs[0], tipo); if (!e) return; state.files[tipo] = e; lab.classList.add('has-file'); lab.classList.remove('invalid'); lab.querySelector('.txt span').textContent = e.nombre; if (tipo === 'CARATULA') autoBanco(fs[0], lab); });
   });
   bindDrop($('drop-cot'), function (fs) { fs.slice(0, 5).forEach(function (f) { var e = prepFile(f, 'COTIZACION'); if (e) state.files.COTIZACION.push(e); }); renderChips(); });
   function renderChips() {
@@ -524,13 +559,17 @@
     if (oc.correoAutoriza === oc.correoSolicitante) return err('Quien autoriza debe ser otra persona.', $('f-correo-aut'));
     if (!oc.empresa) return err('Selecciona la empresa.', $('f-empresa'));
     if (!oc.cc) return err('Selecciona el centro de costos.', $('f-cc'));
+    var ccOk = O.ccDeEmpresa(oc.empresa); if (ccOk && ccOk.indexOf(oc.cc) < 0) return err('El centro de costos no corresponde a ' + oc.empresa + '.', $('f-cc'));
+    if (!oc.frente) return err('Escribe el frente.', $('f-frente'));
+    if (!oc.observaciones) return err('Escribe la solicitud de recurso / motivo de la compra.', $('f-obs'));
     if (state.provMode === 'cat' && !state.prov) return err('Selecciona un proveedor del catálogo o da de alta uno nuevo.', $('f-prov'));
     if (state.provMode === 'nuevo') {
       if (!oc.provNombre) return err('Escribe el nombre del proveedor nuevo.', $('n-nombre'));
       if (oc.provRfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(oc.provRfc)) return err('El RFC del proveedor no es válido.', $('n-rfc'));
       if (state.emite === 'SI' && !oc.provRfc) return err('Si el proveedor factura, captura su RFC.', $('n-rfc'));
       if (!oc.provRegimen) return err('Selecciona el régimen fiscal del proveedor.', $('n-regimen'));
-      if (oc.provClabe && oc.provClabe.length === 18 && !clabeValid(oc.provClabe)) return err('La CLABE no es válida.', $('n-clabe'));
+      if (!clabeValid(oc.provClabe || '')) return err('Captura la CLABE del proveedor (18 dígitos válidos).', $('n-clabe'));
+      if (!state.files.CARATULA) { $('drop-caratula').classList.add('invalid'); return err('Sube la carátula bancaria del proveedor.', $('drop-caratula')); }
     }
     if (oc.provCorreo && !emailRe.test(oc.provCorreo)) return err('El correo del proveedor no es válido.', $('f-prov-correo'));
     if (oc.moneda === 'DOLARES' && oc.tipoCambio <= 1) return err('Captura el tipo de cambio.', $('f-tc'));
@@ -541,6 +580,7 @@
       if (!it.partida) return err('Partida ' + (i + 1) + ': selecciona el insumo.', q('.i-partida'));
       if (!(it.precioUnitario > 0)) return err('Partida ' + (i + 1) + ': captura el precio unitario.', q('.i-pu'));
     }
+    var cr = retCaptured(); if (cr.isr > 0.35 || cr.iva > 0.16) return err('Revisa las retenciones: el ISR no puede pasar de 35 % ni el IVA de 16 %.', $('r-isr'));
     var t = O.calcular(oc); if (t.total <= 0) return err('El total debe ser mayor a cero.');
     return true;
   }
@@ -549,6 +589,7 @@
     e.preventDefault();
     var oc = ocData(); if (!validate(oc)) return;
     oc.totalLetra = O.letras(O.calcular(oc).total, oc.moneda);
+    if (oc.retManual === 'SI') oc.observaciones = (oc.observaciones ? oc.observaciones + ' | ' : '') + 'RETENCIONES CAPTURADAS MANUALMENTE: ISR ' + O.pct(oc.retIsrPct) + ' / IVA ' + O.pct(oc.retIvaPct) + ' (el régimen sugiere ISR ' + O.pct(oc.retSugIsr) + ' / IVA ' + O.pct(oc.retSugIva) + ')';
     var files = [state.files.CARATULA, state.files.CSF].filter(Boolean).filter(function () { return state.provMode === 'nuevo'; }).concat(state.files.COTIZACION);
     try { localStorage.setItem('gfm_oc_me', JSON.stringify({ solicitante: oc.solicitante, correo: oc.correoSolicitante, autoriza: oc.autoriza, 'correo-aut': oc.correoAutoriza })); } catch (x) {}
     $('overlay').hidden = false; $('submit-btn').disabled = true;

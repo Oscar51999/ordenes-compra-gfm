@@ -7,7 +7,6 @@
 
   var EMPRESAS = [
     { nombre: 'GRUPO FIRME DE MEXICO', rfc: 'GFM1211273F4', regimen: '601 - General de Ley Personas Morales', domicilio: 'DURANGO 2145 L1, FRACC. LA PERLA, LA PAZ, B.C.S., C.P. 23040' },
-    { nombre: 'GRUPO EMPRESARIAL FIRME', rfc: '', regimen: '', domicilio: '' },
     { nombre: 'CONTROL DE INGENIERIA Y SERVICIOS AÑADIDOS', rfc: '', regimen: '', domicilio: '' },
     { nombre: 'CONSTRUCCIONES Y TERRACERIAS VANGUARDIA', rfc: '', regimen: '', domicilio: '' },
     { nombre: 'COMERCIALIZADORA MUPO', rfc: '', regimen: '', domicilio: '' },
@@ -21,6 +20,8 @@
   CAT.unidades = ['PZA', 'M', 'ML', 'M2', 'M3', 'KG', 'TON', 'G', 'LT', 'GAL', 'CUBETA', 'TAMBO', 'JGO', 'KIT', 'JUEGO', 'PAR', 'LOTE', 'SERV', 'ACT', 'EST', 'VIAJE', 'HR', 'DÍA', 'SEM', 'MES', 'BULTO', 'SACO', 'ROLLO', 'CAJA', 'PAQ', 'TRAMO', 'HOJA', 'PLIEGO', 'TABLA', 'VARILLA', 'CIENTO', 'MILLAR', 'TONELADA-KM', 'M3-KM', 'GLOBAL'];
   // Centros de costos por empresa. Vacío = la empresa ve todos. Llenar con la relación que mande Finanzas.
   CAT.ccPorEmpresa = {};
+  // Obras por empresa. Vacío = la empresa ve todas.
+  CAT.obrasPorEmpresa = {};
   CAT.formasPago = ['03 - Transferencia electrónica de fondos', '01 - Efectivo', '02 - Cheque nominativo', '04 - Tarjeta de crédito', '28 - Tarjeta de débito', '99 - Por definir'];
   CAT.metodosPago = ['PUE - Pago en una sola exhibición', 'PPD - Pago en parcialidades o diferido'];
   CAT.usosCfdi = ['G01 - Adquisición de mercancías', 'G02 - Devoluciones, descuentos o bonificaciones', 'G03 - Gastos en general', 'I01 - Construcciones', 'I02 - Mobiliario y equipo de oficina por inversiones', 'I03 - Equipo de transporte', 'I04 - Equipo de cómputo y accesorios', 'I05 - Dados, troqueles, moldes, matrices y herramental', 'I06 - Comunicaciones telefónicas', 'I07 - Comunicaciones satelitales', 'I08 - Otra maquinaria y equipo', 'S01 - Sin efectos fiscales'];
@@ -133,6 +134,7 @@
     return { bruto: bruto, amort: amort, fondo: fondo, otras: otras, subtotal: subtotal, iva: iva, retIsr: retIsr, retIva: retIva, total: total, totalMXN: r2(total * (oc.moneda === 'DOLARES' ? tc : 1)) };
   }
 
+  function obrasDeEmpresa(emp) { var l = CAT.obrasPorEmpresa[emp]; return l && l.length ? l : null; }
   function ccDeEmpresa(emp) { var l = CAT.ccPorEmpresa[emp]; return l && l.length ? l : null; }
   function maskClabe(c) { c = String(c || ''); return c.length > 4 ? '•••• ' + c.slice(-4) : c; }
 
@@ -251,7 +253,7 @@
       var endTot = doc.lastAutoTable.finalY;
       var lw = W - 2 * M - 236;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(7.6); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-      doc.text('OBSERVACIONES', M, startTot + 8);
+      doc.text('SOLICITUD DE RECURSO / MOTIVO', M, startTot + 8);
       doc.setFont('helvetica', 'normal'); doc.setTextColor(INK[0], INK[1], INK[2]);
       var obs = doc.splitTextToSize(oc.observaciones || '—', lw);
       doc.text(obs.slice(0, 7), M, startTot + 19);
@@ -376,6 +378,23 @@
   }
   var BANCOS = { '002': 'BANAMEX', '012': 'BBVA BANCOMER', '014': 'SANTANDER', '021': 'HSBC', '030': 'BAJIO', '036': 'INBURSA', '042': 'MIFEL', '044': 'SCOTIABANK', '058': 'BANREGIO', '059': 'INVEX', '062': 'AFIRME', '072': 'BANORTE', '106': 'BANK OF AMERICA', '127': 'AZTECA', '128': 'AUTOFIN', '130': 'COMPARTAMOS', '137': 'BANCOPPEL', '138': 'ABC CAPITAL', '140': 'CONSUBANCO', '143': 'CIBANCO', '145': 'BBASE', '147': 'BANKAOOL', '156': 'SABADELL', '166': 'BANSEFI', '638': 'NU MEXICO', '646': 'STP', '722': 'MERCADO PAGO' };
   function clabeValid(c) { if (!/^\d{18}$/.test(c)) return false; var w = [3, 7, 1], t = 0; for (var i = 0; i < 17; i++) t += (+c[i] * w[i % 3]) % 10; return (10 - t % 10) % 10 === +c[17]; }
+
+  // ---------- lectura de carátula bancaria (PDF) ----------
+  function leerCaratula(file) {
+    if (!(/\.pdf$/i.test(file.name) || /pdf/.test(file.type))) return Promise.resolve({});
+    return pdfText(file).then(function (T) {
+      var d = {}, flat = T.replace(/(\d)[ \-](?=\d)/g, '$1');
+      var lbl = T.match(/CLABE[^\d\n]{0,30}([\d \-]{18,26})/i);
+      if (lbl) { var c = lbl[1].replace(/\D/g, ''); if (clabeValid(c)) d.clabe = c; }
+      if (!d.clabe) d.clabe = (flat.match(/\d{18}/g) || []).filter(clabeValid)[0] || '';
+      if (d.clabe) d.banco = BANCOS[d.clabe.slice(0, 3)] || '';
+      var cta = T.match(/(?:No\.?|N[uú]mero)\s*de\s*cuenta[^\d\n]{0,15}(\d{8,12})\b/i);
+      if (cta) d.cuenta = cta[1];
+      var tit = T.match(/(?:Titular|Nombre del cliente|Raz[oó]n social|Cliente|Nombre)\s*[:.]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .,&]{4,90})/);
+      if (tit) d.titular = tit[1].replace(/\s+(RFC|R\.F\.C|CLABE|CUENTA|No\.).*$/i, '').replace(/\s+/g, ' ').trim();
+      return d;
+    }).catch(function () { return {}; });
+  }
   // Devuelve { fuente, nombre, rfc, regimen, cp } (campos vacíos si no se detectan)
   function leerDocumentoProveedor(file) {
     if (/\.xml$/i.test(file.name) || /xml/.test(file.type)) return file.text().then(function (x) { var r = parseXmlProveedor(x); if (!r) throw new Error('El XML no es un CFDI válido.'); return r; });
@@ -387,7 +406,7 @@
     CAT: CAT, EMPRESAS: EMPRESAS, ESTADOS: ESTADOS, ESTADO_LABEL: ESTADO_LABEL, LEYENDA: LEYENDA, FORMATO: FORMATO,
     num: num, r2: r2, money: money, pct: pct, fmtDate: fmtDate, addDays: addDays, todayISO: todayISO, esc: esc,
     letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas,
-    calcular: calcular, maskClabe: maskClabe, ccDeEmpresa: ccDeEmpresa, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
+    calcular: calcular, maskClabe: maskClabe, ccDeEmpresa: ccDeEmpresa, obrasDeEmpresa: obrasDeEmpresa, leerCaratula: leerCaratula, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
     leerDocumentoProveedor: leerDocumentoProveedor, parsePdfProveedor: parsePdfProveedor, parseXmlProveedor: parseXmlProveedor, regimenPorCodigo: regimenPorCodigo, BANCOS: BANCOS, clabeValid: clabeValid
   };
 })(window);
