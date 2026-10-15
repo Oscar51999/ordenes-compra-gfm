@@ -87,6 +87,7 @@
 <main>
   <div class="card gate" id="gate">
     <h2 class="section-title">Acceso</h2>
+    <div class="field"><label for="g-user">Usuario</label><input type="text" id="g-user" autocomplete="username" autocapitalize="characters" placeholder="Ej. OSCAR COTA"></div>
     <div class="field"><label for="g-pwd">Contraseña</label><input type="password" id="g-pwd" autocomplete="current-password"></div>
     <p class="error-msg" id="gate-error"></p>
     <button class="primary" id="g-btn" type="button">Entrar</button>
@@ -96,6 +97,8 @@
     <div class="bar">
       <span class="conn" id="conn">Conectando…</span>
       <div class="acts">
+        <span class="conn" id="who" style="font-weight:600"></span>
+        <button class="btn ghost sm" id="b-logout" type="button">Salir</button>
         <button class="btn ghost sm" id="b-refresh" type="button">↻ Actualizar</button>
         <button class="btn ghost sm" id="b-xlsx" type="button">⬇ Exportar Excel</button>
         <button class="btn ghost sm" id="b-prov" type="button">＋ Alta de proveedor</button>
@@ -193,18 +196,29 @@
   function post(body) { body.key = KEY; return fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }).then(function (r) { return r.json(); }); }
 
   // ---------- acceso ----------
-  function tryLogin(pwd, silent) {
+  var USER = '';
+  function tryLogin(key, silent) {
     if (!APPS_SCRIPT_URL) { $('gate-error').textContent = 'El panel aún no está conectado al servidor.'; $('gate-error').classList.add('show'); return; }
-    KEY = pwd; $('g-btn').disabled = true;
+    if (!silent && (key.split('|')[0].trim() === '' || key.indexOf('|') < 0 || !key.split('|').slice(1).join('|'))) { $('gate-error').textContent = 'Escribe tu usuario y contraseña.'; $('gate-error').classList.add('show'); return; }
+    $('gate-error').classList.remove('show');
+    KEY = key; $('g-btn').disabled = true;
     api({ action: 'ping' }).then(function (d) {
-      if (!d || !d.ok) { KEY = ''; try { sessionStorage.removeItem('gfm_oc_key'); } catch (e) {} if (!silent) { $('gate-error').textContent = d && d.error === 'unauthorized' ? 'Contraseña incorrecta.' : 'No se pudo conectar con el servidor.'; $('gate-error').classList.add('show'); } return; }
-      try { sessionStorage.setItem('gfm_oc_key', pwd); } catch (e) {}
+      if (!d || !d.ok) { KEY = ''; try { sessionStorage.removeItem('gfm_oc_key'); } catch (e) {} if (!silent) { $('gate-error').textContent = d && d.error === 'unauthorized' ? 'Usuario o contraseña incorrectos.' : 'No se pudo conectar con el servidor.'; $('gate-error').classList.add('show'); } return; }
+      try { sessionStorage.setItem('gfm_oc_key', key); } catch (e) {}
+      USER = d.usuario || ''; $('who').textContent = USER ? '👤 ' + USER : '';
       $('gate').hidden = true; $('app').hidden = false; load(); timer = setInterval(load, POLL_MS);
     }).catch(function () { $('gate-error').textContent = 'No se pudo conectar con el servidor.'; $('gate-error').classList.add('show'); }).then(function () { $('g-btn').disabled = false; });
   }
-  $('g-btn').addEventListener('click', function () { tryLogin($('g-pwd').value); });
-  $('g-pwd').addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(this.value); });
-  try { var saved = sessionStorage.getItem('gfm_oc_key'); if (saved) tryLogin(saved, true); } catch (e) {}
+  function loginKey() { return $('g-user').value.trim().toUpperCase().replace(/\s+/g, ' ') + '|' + $('g-pwd').value; }
+  $('g-btn').addEventListener('click', function () { tryLogin(loginKey()); });
+  $('g-pwd').addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(loginKey()); });
+  $('g-user').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('g-pwd').focus(); });
+  $('b-logout').addEventListener('click', function () {
+    try { sessionStorage.removeItem('gfm_oc_key'); } catch (e) {}
+    KEY = ''; USER = ''; if (timer) clearInterval(timer); timer = null; all = [];
+    $('app').hidden = true; $('gate').hidden = false; $('g-pwd').value = ''; $('g-user').focus();
+  });
+  try { var saved = sessionStorage.getItem('gfm_oc_key'); if (saved && saved.indexOf('|') > 0) tryLogin(saved, true); else if (saved) sessionStorage.removeItem('gfm_oc_key'); } catch (e) {}
 
   // ---------- datos ----------
   function load() {
@@ -320,7 +334,7 @@
       if (campos.estado === 'pagada' && !campos.fechaPago) { toast('Captura la fecha de pago'); return; }
       if (campos.estado === 'cancelada' && !campos.comentarioAdmin) { toast('Escribe el motivo de la cancelación'); return; }
       busy(true, 'Guardando…');
-      post({ accion: 'actualizar', folio: r.folio, campos: campos, usuario: 'Panel Compras' }).then(function (d) {
+      post({ accion: 'actualizar', folio: r.folio, campos: campos, usuario: USER || 'Panel' }).then(function (d) {
         if (!d.ok) throw new Error(d.error); toast('Guardado' + (campos.estado !== r.estado ? ' · se avisó al solicitante' : '')); return load();
       }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); });
     };
@@ -340,7 +354,7 @@
     if (estado === 'rechazada' && !com) { toast('Escribe el motivo del rechazo'); $('d-com').focus(); return; }
     if (estado === r.estado && !com) { toast('La orden ya está ' + O.ESTADO_LABEL[estado].toLowerCase()); return; }
     busy(true, 'Guardando…');
-    post({ accion: 'actualizar', folio: r.folio, campos: { estado: estado, comentarioAdmin: com }, usuario: 'Panel Compras' }).then(function (d) {
+    post({ accion: 'actualizar', folio: r.folio, campos: { estado: estado, comentarioAdmin: com }, usuario: USER || 'Panel' }).then(function (d) {
       if (!d.ok) throw new Error(d.error);
       toast(O.ESTADO_LABEL[estado] + ' · se avisó a ' + r.solicitante); return load();
     }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); });
@@ -357,7 +371,7 @@
       toast('La orden ya está ' + O.ESTADO_LABEL[r.estado].toLowerCase() + '. Vuelve a presionar para desautorizarla.'); return;
     }
     busy(true, 'Desautorizando…');
-    post({ accion: 'actualizar', folio: r.folio, campos: { estado: 'por_autorizar', comentarioAdmin: 'DESAUTORIZADA (antes ' + O.ESTADO_LABEL[r.estado] + '): ' + com }, usuario: 'Panel Compras' }).then(function (d) {
+    post({ accion: 'actualizar', folio: r.folio, campos: { estado: 'por_autorizar', comentarioAdmin: 'DESAUTORIZADA (antes ' + O.ESTADO_LABEL[r.estado] + '): ' + com }, usuario: USER || 'Panel' }).then(function (d) {
       if (!d.ok) throw new Error(d.error);
       toast('Desautorizada · regresó a Pendiente y se avisó a ' + r.solicitante); return load();
     }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); $('d-unauth').dataset.confirm = ''; $('d-unauth').textContent = '↺ Desautorizar'; });
@@ -373,7 +387,7 @@
     $('send-modal').hidden = true; busy(true, 'Generando y enviando…');
     var rr = JSON.parse(JSON.stringify(r)); rr.estado = 'enviada';
     O.buildPdf(rr, { clabeCompleta: true }).then(function (doc) {
-      return post({ accion: 'enviarProveedor', folio: r.folio, correo: to, mensaje: $('s-msg').value.trim(), pdf: doc.output('datauristring'), usuario: 'Panel Compras' });
+      return post({ accion: 'enviarProveedor', folio: r.folio, correo: to, mensaje: $('s-msg').value.trim(), pdf: doc.output('datauristring'), usuario: USER || 'Panel' });
     }).then(function (d) { if (!d.ok) throw new Error(d.error); toast('Orden enviada a ' + to); return load(); })
       .catch(function (x) { toast('No se envió: ' + (x.message || x)); }).then(function () { busy(false); });
   };
