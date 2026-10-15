@@ -180,12 +180,28 @@
   function maskClabe(c) { c = String(c || ''); return c.length > 4 ? '•••• ' + c.slice(-4) : c; }
 
   // ---------- PDF FO-GF-02 (jsPDF + autotable) ----------
-  var logoCache = null;
+  // Logo de cada empresa para el PDF (si no hay, se usa logo.png de Grupo Firme).
+  var LOGOS = {
+    'GRUPO FIRME DE MEXICO': 'logo-gfm.png',
+    'SANTA CRUZ FID': 'logo-scf.png',
+    'CONTROL DE INGENIERIA Y SERVICIOS AÑADIDOS': 'logo-cisa.png',
+    'CONSTRUCCIONES Y TERRACERIAS VANGUARDIA': 'logo-ctv.png',
+    'COMERCIALIZADORA MUPO': 'logo-mupo.png',
+    'PROYECTOS Y DESARROLLOS PUNTA CORTEZ': 'logo-pc.png'
+  };
+  function logoDeEmpresa(emp) { return LOGOS[String(emp || '').trim().toUpperCase()] || 'logo.png'; }
+  var logoCache = {};
+  function fetchLogo(src) {
+    return fetch(src).then(function (r) { if (!r.ok) throw new Error(r.status); return r.blob(); }).then(function (b) {
+      return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(b); });
+    }).then(function (data) {
+      return new Promise(function (res) { var im = new Image(); im.onload = function () { res({ data: data, w: im.naturalWidth || 1, h: im.naturalHeight || 1 }); }; im.onerror = function () { res({ data: data, w: 118, h: 33 }); }; im.src = data; });
+    });
+  }
   function loadLogo(src) {
-    if (logoCache) return Promise.resolve(logoCache);
-    return fetch(src || 'logo.png').then(function (r) { return r.blob(); }).then(function (b) {
-      return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { logoCache = fr.result; res(logoCache); }; fr.readAsDataURL(b); });
-    }).catch(function () { return null; });
+    src = src || 'logo.png';
+    if (!logoCache[src]) logoCache[src] = fetchLogo(src).catch(function () { return src !== 'logo.png' ? loadLogo('logo.png') : null; });
+    return logoCache[src];
   }
   function loadScript(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
   var pdfLibs = null;
@@ -200,7 +216,7 @@
   // oc: registro completo. opts: { clabeCompleta: bool, logo: 'logo.png' }
   function buildPdf(oc, opts) {
     opts = opts || {};
-    return Promise.all([ensurePdfLibs(), loadLogo(opts.logo)]).then(function (res) {
+    return Promise.all([ensurePdfLibs(), loadLogo(opts.logo || logoDeEmpresa(oc.empresa))]).then(function (res) {
       var logo = res[1];
       var jsPDF = global.jspdf.jsPDF;
       var doc = new jsPDF({ unit: 'pt', format: 'letter' });
@@ -215,7 +231,7 @@
       doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]); doc.rect(W * 0.6, 0, W * 0.25, 6, 'F');
       doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]); doc.rect(W * 0.85, 0, W * 0.15, 6, 'F');
       var y = 22;
-      if (logo) doc.addImage(logo, 'PNG', M, y, 118, 33, 'logo', 'FAST');
+      if (logo) { var lsc = Math.min(150 / logo.w, 40 / logo.h), lw = logo.w * lsc, lh = logo.h * lsc; doc.addImage(logo.data, 'PNG', M, y + (40 - lh) / 2 - 4, lw, lh, undefined, 'FAST'); }
       doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(TEAL[0], TEAL[1], TEAL[2]);
       doc.text('ORDEN DE COMPRA', W - M, y + 12, { align: 'right' });
       doc.setFontSize(10.5); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
@@ -449,7 +465,7 @@
   global.OC = {
     CAT: CAT, EMPRESAS: EMPRESAS, ESTADOS: ESTADOS, ESTADO_LABEL: ESTADO_LABEL, LEYENDA: LEYENDA, FORMATO: FORMATO,
     num: num, r2: r2, money: money, pct: pct, fmtDate: fmtDate, addDays: addDays, todayISO: todayISO, esc: esc,
-    letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas, servicioDeInsumo: servicioDeInsumo, retEtiqueta: retEtiqueta, retPorPartida: retPorPartida,
+    letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas, logoDeEmpresa: logoDeEmpresa, servicioDeInsumo: servicioDeInsumo, retEtiqueta: retEtiqueta, retPorPartida: retPorPartida,
     calcular: calcular, maskClabe: maskClabe, ccDeEmpresa: ccDeEmpresa, obrasDeEmpresa: obrasDeEmpresa, insumosPara: insumosPara, leerCaratula: leerCaratula, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
     leerDocumentoProveedor: leerDocumentoProveedor, parsePdfProveedor: parsePdfProveedor, parseXmlProveedor: parseXmlProveedor, regimenPorCodigo: regimenPorCodigo, BANCOS: BANCOS, clabeValid: clabeValid
   };
