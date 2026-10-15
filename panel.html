@@ -29,6 +29,7 @@
   .filters input, .filters select { background: var(--surface); padding: 9px 10px; font-size: 13px; }
   .list .tbl table { font-size: 12.5px; }
   .list tr.row { cursor: pointer; }
+  .list .c { text-align: center; white-space: nowrap; }
   .list tr.row:hover td { background: color-mix(in srgb, var(--c1) 7%, var(--surface)); }
   .flag { font-size: 10.5px; font-weight: 600; color: var(--critical); margin-left: 6px; }
   .empty { text-align: center; color: var(--ink-soft); padding: 28px 0; font-size: 13.5px; }
@@ -39,6 +40,7 @@
   .decision input { background: var(--paper); padding: 10px 12px; }
   .decision .btns { display: flex; gap: 8px; flex-wrap: wrap; }
   .decision .btn { padding: 11px 16px; }
+  .btn.unauth { background: #7C2D12; color: #fff; } .btn.unauth:hover { background: #5B1F0C; }
   .btn.pend { background: #B7791F; color: #fff; } .btn.pend:hover { background: #975A16; }
   .btn.is-on { outline: 3px solid color-mix(in srgb, var(--ink) 25%, transparent); outline-offset: 2px; }
   @media (max-width: 700px) { .decision { grid-template-columns: 1fr; } .decision .btns .btn { flex: 1; justify-content: center; } }
@@ -121,6 +123,7 @@
       <button class="btn ok" id="d-ok" type="button">✓ Aceptar</button>
       <button class="btn pend" id="d-pend" type="button">⏸ Pendiente</button>
       <button class="btn danger" id="d-no" type="button">✕ Rechazar</button>
+      <button class="btn unauth" id="d-unauth" type="button" hidden>↺ Desautorizar</button>
     </div>
   </div>
 </aside>
@@ -235,11 +238,17 @@
     Array.prototype.forEach.call($('kpis').querySelectorAll('.kpi'), function (b) { b.onclick = function () { kpiFilter = kpiFilter === b.dataset.k ? '' : b.dataset.k; render(); }; });
     var rows = filtered();
     $('empty').hidden = rows.length > 0;
-    $('tbl').innerHTML = '<tr><th>Folio</th><th>Fecha</th><th>Estado</th><th>Proveedor</th><th>Solicita</th><th>Centro de costos</th><th class="r">Total</th><th>Pago aprox.</th></tr>' + rows.map(function (r) {
+    $('tbl').innerHTML = '<tr><th>Folio</th><th>Fecha</th><th>Estado</th><th>Proveedor</th><th>Solicita</th><th>Centro de costos</th><th class="r">Total</th><th>Pago aprox.</th><th class="c">PDF</th></tr>' + rows.map(function (r) {
       var flags = (vencida(r) ? '<span class="flag">VENCIDA</span>' : '') + (nuevoPend(r) ? '<span class="flag" style="color:var(--warn)">PROV. NUEVO</span>' : '');
-      return '<tr class="row" data-f="' + esc(r.folio) + '"><td class="mono">' + esc(r.folio) + (r.reqFolio ? '<br><span class="hint" style="margin:0">' + esc(r.reqFolio) + '</span>' : '') + '</td><td>' + O.fmtDate(r.fecha) + '</td><td>' + badge(r.estado) + '</td><td class="wrap">' + esc(r.provNombre) + flags + '</td><td class="wrap">' + esc(r.solicitante) + '</td><td class="wrap">' + esc(r.cc) + '</td><td class="r">' + money(r.total, r.moneda) + '</td><td>' + O.fmtDate(r.fechaPagoEstimada) + '</td></tr>';
+      return '<tr class="row" data-f="' + esc(r.folio) + '"><td class="mono">' + esc(r.folio) + (r.reqFolio ? '<br><span class="hint" style="margin:0">' + esc(r.reqFolio) + '</span>' : '') + '</td><td>' + O.fmtDate(r.fecha) + '</td><td>' + badge(r.estado) + '</td><td class="wrap">' + esc(r.provNombre) + flags + '</td><td class="wrap">' + esc(r.solicitante) + '</td><td class="wrap">' + esc(r.cc) + '</td><td class="r">' + money(r.total, r.moneda) + '</td><td>' + O.fmtDate(r.fechaPagoEstimada) + '</td><td class="c"><button type="button" class="btn ghost sm row-pdf" data-f="' + esc(r.folio) + '" title="Descargar PDF con el logo de ' + esc(r.empresa) + '">⬇ PDF</button></td></tr>';
     }).join('');
     Array.prototype.forEach.call($('tbl').querySelectorAll('tr.row'), function (tr) { tr.onclick = function () { openDetail(all.filter(function (x) { return x.folio === tr.dataset.f; })[0]); }; });
+    Array.prototype.forEach.call($('tbl').querySelectorAll('.row-pdf'), function (b) { b.onclick = function (ev) { ev.stopPropagation(); descargarPdf(all.filter(function (x) { return x.folio === b.dataset.f; })[0]); }; });
+  }
+  function descargarPdf(r) {
+    if (!r) return;
+    busy(true, 'Generando PDF…');
+    O.buildPdf(r, { clabeCompleta: true }).then(function (doc) { doc.save(r.folio + '_FO-GF-02.pdf'); }).catch(function () { toast('No se pudo generar el PDF'); }).then(function () { busy(false); });
   }
   function filtered() {
     var q = $('f-q').value.trim().toLowerCase(), est = $('f-estado').value, emp = $('f-empresa').value, al = $('f-alerta').value;
@@ -303,7 +312,7 @@
         '<button class="btn sm" id="e-save" type="button">Guardar cambios</button></div>' +
       '<div class="card"><p class="section-title" style="font-size:16px">Historial</p><ul class="hist">' + (r.historial || []).slice().reverse().map(function (h) { return '<li><span class="when">' + esc(h.f ? new Date(h.f).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '') + '</span> · ' + badge(h.e) + ' · <b>' + esc(h.u) + '</b>' + (h.c ? '<br>' + esc(h.c) : '') + '</li>'; }).join('') + '</ul></div>';
 
-    $('a-pdf').onclick = function () { busy(true, 'Generando PDF…'); O.buildPdf(r, { clabeCompleta: true }).then(function (doc) { doc.save(r.folio + '_FO-GF-02.pdf'); }).catch(function () { toast('No se pudo generar el PDF'); }).then(function () { busy(false); }); };
+    $('a-pdf').onclick = function () { descargarPdf(r); };
     if ($('a-send')) $('a-send').onclick = function () { $('s-to').value = r.provCorreo || ''; $('s-msg').value = ''; $('s-err').classList.remove('show'); $('send-modal').hidden = false; $('s-to').focus(); };
     if ($('a-remind')) $('a-remind').onclick = function () { busy(true, 'Enviando recordatorio…'); post({ accion: 'reenviarAutorizacion', folio: r.folio }).then(function (d) { toast(d.ok ? 'Recordatorio enviado a ' + r.correoAutoriza : d.error); }).catch(function () { toast('Error de conexión'); }).then(function () { busy(false); }); };
     $('e-save').onclick = function () {
@@ -321,6 +330,9 @@
     $('d-ok').classList.toggle('is-on', r.estado === 'autorizada');
     $('d-pend').classList.toggle('is-on', r.estado === 'por_autorizar');
     $('d-no').classList.toggle('is-on', r.estado === 'rechazada');
+    var autorizadaYa = ['autorizada', 'enviada', 'recibida', 'facturada', 'pagada'].indexOf(r.estado) >= 0;
+    $('d-unauth').hidden = !autorizadaYa; $('d-unauth').dataset.confirm = ''; $('d-unauth').textContent = '↺ Desautorizar';
+    $('d-ok').hidden = autorizadaYa;
   }
   function decidir(estado) {
     var r = current; if (!r) return;
@@ -336,6 +348,20 @@
   $('d-ok').onclick = function () { decidir('autorizada'); };
   $('d-pend').onclick = function () { decidir('por_autorizar'); };
   $('d-no').onclick = function () { decidir('rechazada'); };
+  $('d-unauth').onclick = function () {
+    var r = current; if (!r) return;
+    var com = $('d-com').value.trim();
+    if (!com) { toast('Escribe el motivo para desautorizar'); $('d-com').focus(); return; }
+    if (['facturada', 'pagada'].indexOf(r.estado) >= 0 && $('d-unauth').dataset.confirm !== r.folio) {
+      $('d-unauth').dataset.confirm = r.folio; $('d-unauth').textContent = '↺ Confirmar: ya está ' + O.ESTADO_LABEL[r.estado].toLowerCase();
+      toast('La orden ya está ' + O.ESTADO_LABEL[r.estado].toLowerCase() + '. Vuelve a presionar para desautorizarla.'); return;
+    }
+    busy(true, 'Desautorizando…');
+    post({ accion: 'actualizar', folio: r.folio, campos: { estado: 'por_autorizar', comentarioAdmin: 'DESAUTORIZADA (antes ' + O.ESTADO_LABEL[r.estado] + '): ' + com }, usuario: 'Panel Compras' }).then(function (d) {
+      if (!d.ok) throw new Error(d.error);
+      toast('Desautorizada · regresó a Pendiente y se avisó a ' + r.solicitante); return load();
+    }).catch(function (x) { toast('No se guardó: ' + (x.message || x)); }).then(function () { busy(false); $('d-unauth').dataset.confirm = ''; $('d-unauth').textContent = '↺ Desautorizar'; });
+  };
   function closeDetail() { $('drawer').hidden = $('drawer-bg').hidden = true; current = null; }
   $('d-close').onclick = closeDetail; $('drawer-bg').onclick = closeDetail;
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('send-modal').hidden) $('send-modal').hidden = true; else if (!$('prov-modal').hidden) $('prov-modal').hidden = true; else closeDetail(); } });
