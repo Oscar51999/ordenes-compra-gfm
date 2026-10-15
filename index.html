@@ -35,6 +35,10 @@
   .ig1 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
   .ig2 { display: grid; grid-template-columns: 90px 110px 1fr; gap: 10px; }
   .ig3 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
+  .ig4 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .ig4 .i-ret.neg { color: var(--critical, #b42318); }
+  .ig4 input.manual { outline: 2px solid #e8a33d; }
+  @media (max-width: 640px) { .ig4 { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 640px) { .ig1, .ig3 { grid-template-columns: 1fr 1fr; } .ig2 { grid-template-columns: 1fr 1fr; } .ig2 .f-desc-wrap { grid-column: 1 / -1; } .ig1 > :first-child { grid-column: 1 / -1; } }
   .line-sub { font-family: 'Roboto Mono', monospace; font-weight: 600; font-size: 15px; text-align: right; padding: 9px 0; }
   #add-item-btn { font: inherit; font-weight: 600; font-size: 13.5px; color: var(--ink); background: color-mix(in srgb, var(--sc) 12%, var(--surface)); border: 1px dashed var(--sc); border-radius: 10px; padding: 12px; cursor: pointer; width: 100%; margin-top: 12px; }
@@ -157,17 +161,14 @@
 
     <div class="row2">
       <div class="field"><label for="f-prov-correo">Correo del proveedor <span class="opt">(para enviarle la orden)</span></label><input type="email" id="f-prov-correo" placeholder="ventas@proveedor.com"></div>
-      <div class="field"><label for="f-servicio">Tipo de servicio</label><select id="f-servicio"></select></div>
+      <div></div>
     </div>
     <div class="field">
       <label>¿El proveedor emite factura?</label>
       <div class="seg" id="emite-seg"><button type="button" data-v="SI" aria-pressed="true">Sí, factura</button><button type="button" data-v="NO" aria-pressed="false">No factura</button></div>
     </div>
-    <div class="ret-box" id="ret-box"><span id="ret-motivo">Selecciona un proveedor para calcular retenciones.</span><span>Sugerido por régimen: ISR <b id="ret-isr">0 %</b> · IVA <b id="ret-iva">0 %</b></span></div>
-    <div class="row2 ret-edit">
-      <div class="field"><label for="r-isr">Retención de ISR %</label><input type="text" id="r-isr" class="money" inputmode="decimal" value="0"></div>
-      <div class="field"><label for="r-iva">Retención de IVA %</label><input type="text" id="r-iva" class="money" inputmode="decimal" value="0"></div>
-    </div>
+    <div class="ret-box" id="ret-box"><span id="ret-motivo">Selecciona un proveedor para calcular retenciones.</span><span>Retenciones: ISR <b id="ret-isr">0 %</b> · IVA <b id="ret-iva">0 %</b></span></div>
+    <p class="hint">Las retenciones se calculan <b>por partida</b>: el ISR según el régimen del proveedor y el IVA según el tipo de servicio que se detecta del insumo (honorarios, fletes, arrendamiento). Puedes ajustarlas en cada partida.</p>
     <p class="hint warn" id="ret-warn" hidden></p>
   </div>
 
@@ -265,7 +266,6 @@
   // ---- catálogos ----
   opts($('f-empresa'), O.EMPRESAS.map(function (e) { return e.nombre; }), 'Selecciona la empresa');
   opts($('f-cc'), CAT.cc, 'Selecciona el centro de costos');
-  opts($('f-servicio'), CAT.servicios);
   opts($('f-forma'), CAT.formasPago);
   opts($('f-metodo'), CAT.metodosPago);
   opts($('f-uso'), CAT.usosCfdi); $('f-uso').value = 'G03 - Gastos en general';
@@ -347,7 +347,6 @@
     updRet();
   });
   $('n-regimen').addEventListener('change', updRet);
-  $('f-servicio').addEventListener('change', updRet);
 
   var BANCOS = { '002': 'BANAMEX', '012': 'BBVA BANCOMER', '014': 'SANTANDER', '021': 'HSBC', '030': 'BAJIO', '036': 'INBURSA', '042': 'MIFEL', '044': 'SCOTIABANK', '058': 'BANREGIO', '059': 'INVEX', '062': 'AFIRME', '072': 'BANORTE', '106': 'BANK OF AMERICA', '127': 'AZTECA', '128': 'AUTOFIN', '130': 'COMPARTAMOS', '137': 'BANCOPPEL', '138': 'ABC CAPITAL', '140': 'CONSUBANCO', '143': 'CIBANCO', '145': 'BBASE', '147': 'BANKAOOL', '156': 'SABADELL', '166': 'BANSEFI', '638': 'NU MEXICO', '646': 'STP', '722': 'MERCADO PAGO' };
   function clabeValid(c) { if (!/^\d{18}$/.test(c)) return false; var w = [3, 7, 1], s = 0; for (var i = 0; i < 17; i++) s += (+c[i] * w[i % 3]) % 10; return (10 - s % 10) % 10 === +c[17]; }
@@ -365,26 +364,47 @@
     return state.prov;
   }
   var ret = { isr: 0, iva: 0 };
-  function updRet() {
+  function sugerida(serv) {
     var p = provData();
-    if (state.emite === 'NO') { ret = { isr: 0, iva: 0 }; $('ret-motivo').textContent = 'Sin factura: no se calcula IVA ni retenciones.'; }
-    else if (!p || (!p.regimen && !p.rfc)) { ret = { isr: 0, iva: 0 }; $('ret-motivo').textContent = 'Selecciona un proveedor para calcular retenciones.'; }
-    else { var s = O.retencionesSugeridas(p.regimen, p.rfc, $('f-servicio').value); ret = s; $('ret-motivo').textContent = s.motivo + '.'; }
-    $('ret-isr').textContent = O.pct(ret.isr); $('ret-iva').textContent = O.pct(ret.iva);
-    $('r-isr').value = fmtPct(ret.isr); $('r-iva').value = fmtPct(ret.iva);
-    var off = state.emite === 'NO'; $('r-isr').disabled = off; $('r-iva').disabled = off;
+    if (state.emite === 'NO') return { isr: 0, iva: 0, motivo: 'Sin factura: no se calcula IVA ni retenciones' };
+    if (!p || (!p.regimen && !p.rfc)) return { isr: 0, iva: 0, motivo: 'Selecciona un proveedor para calcular retenciones' };
+    return O.retencionesSugeridas(p.regimen, p.rfc, serv);
+  }
+  function autoServ(it) {
+    if (it.servManual) return;
+    it.q('.i-serv').value = O.servicioDeInsumo(it.q('.i-partida').value, it.q('.i-desc').value);
+  }
+  function applyRet(it) {
+    it.sug = sugerida(it.q('.i-serv').value);
+    if (!it.rateManual) { it.q('.i-risr').value = fmtPct(it.sug.isr); it.q('.i-riva').value = fmtPct(it.sug.iva); }
+    var off = state.emite === 'NO'; it.q('.i-risr').disabled = off; it.q('.i-riva').disabled = off; it.q('.i-serv').disabled = off;
+    if (off) { it.q('.i-risr').value = '0'; it.q('.i-riva').value = '0'; }
+  }
+  function updRet() {
+    state.items.forEach(function (it) { autoServ(it); applyRet(it); });
+    var mot = {}, isr = {}, iva = {};
+    state.items.forEach(function (it) { var s = it.sug || sugerida('Generales'); mot[s.motivo] = 1; var c = itemRet(it); isr[O.pct(c.isr)] = 1; iva[O.pct(c.iva)] = 1; });
+    var ms = Object.keys(mot); if (!ms.length) ms = [sugerida('Generales').motivo];
+    $('ret-motivo').textContent = ms.join(' · ') + '.';
+    var ki = Object.keys(isr), kv = Object.keys(iva);
+    $('ret-isr').textContent = ki.length === 1 ? ki[0] : 'por partida'; $('ret-iva').textContent = kv.length === 1 ? kv[0] : 'por partida';
     chkRet(); recalc();
   }
   function fmtPct(x) { var v = Math.round(num(x) * 10000) / 100; return String(v); }
-  function retCaptured() { return { isr: num($('r-isr').value) / 100, iva: num($('r-iva').value) / 100 }; }
+  function itemRet(it) { return state.emite === 'NO' ? { isr: 0, iva: 0 } : { isr: num(it.q('.i-risr').value) / 100, iva: num(it.q('.i-riva').value) / 100 }; }
   function chkRet() {
-    var c = retCaptured(), w = $('ret-warn');
-    var dif = Math.abs(c.isr - ret.isr) > 0.00005 || Math.abs(c.iva - ret.iva) > 0.00005;
-    w.hidden = !dif || state.emite === 'NO';
-    w.textContent = 'Las retenciones capturadas no coinciden con el régimen del proveedor (' + ($('ret-motivo').textContent || '').replace(/\.$/, '') + '). Verifícalo antes de enviar; se marcará en la orden.';
-    return !dif;
+    var bad = [];
+    state.items.forEach(function (it, i) {
+      var c = itemRet(it), s = it.sug || { isr: 0, iva: 0 };
+      var dif = state.emite !== 'NO' && (Math.abs(c.isr - s.isr) > 0.00005 || Math.abs(c.iva - s.iva) > 0.00005);
+      it.q('.i-risr').classList.toggle('manual', dif); it.q('.i-riva').classList.toggle('manual', dif);
+      if (dif) bad.push(i + 1);
+    });
+    var w = $('ret-warn'); w.hidden = !bad.length;
+    w.textContent = 'Partida ' + bad.join(', ') + ': las retenciones capturadas no coinciden con el régimen del proveedor. Verifícalo antes de enviar; se marcará en la orden.';
+    state.retManualPartidas = bad;
+    return !bad.length;
   }
-  ['r-isr', 'r-iva'].forEach(function (id) { $(id).addEventListener('input', function () { this.value = this.value.replace(/[^0-9.]/g, ''); chkRet(); recalc(); }); });
 
   // ---- condiciones ----
   function updPago() {
@@ -413,7 +433,11 @@
       '<div class="field f-desc-wrap"><label>Descripción</label><input type="text" class="i-desc" placeholder="Ej. Concreto f\'c=350 kg/cm² TMA 20 mm"></div></div>' +
       '<div class="ig3"><div class="field"><label>Precio unitario (sin IVA)</label><input type="text" class="i-pu money" inputmode="decimal" placeholder="0.00"></div>' +
       '<div class="field"><label>IVA</label><select class="i-iva">' + CAT.tasasIva.map(function (t) { return '<option value="' + t.v + '">' + t.l + '</option>'; }).join('') + '</select></div>' +
-      '<div class="field"><label>Subtotal</label><div class="line-sub i-sub">$0.00</div></div><div></div></div>';
+      '<div class="field"><label>Subtotal</label><div class="line-sub i-sub">$0.00</div></div><div></div></div>' +
+      '<div class="ig4"><div class="field"><label>Tipo (para retención)</label><select class="i-serv">' + CAT.servicios.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>Ret. ISR %</label><input type="text" class="i-risr money" inputmode="decimal" value="0"></div>' +
+      '<div class="field"><label>Ret. IVA %</label><input type="text" class="i-riva money" inputmode="decimal" value="0"></div>' +
+      '<div class="field"><label>Retención</label><div class="line-sub i-ret">$0.00</div></div></div>';
     var q = function (c) { return row.querySelector(c); };
     var it = { row: row, q: q };
     if (obraDef && ccLista().indexOf(obraDef) >= 0) q('.i-obra').value = obraDef;
@@ -423,9 +447,13 @@
     if (pre.partida) q('.i-partida').value = pre.partida;
     if (pre.precioUnitario) q('.i-pu').value = r2(num(pre.precioUnitario)).toFixed(2);
     row.querySelectorAll('input,select').forEach(function (x) { x.addEventListener('input', recalc); x.addEventListener('change', recalc); });
+    q('.i-partida').addEventListener('change', function () { autoServ(it); applyRet(it); updRet(); });
+    q('.i-desc').addEventListener('change', function () { autoServ(it); applyRet(it); updRet(); });
+    q('.i-serv').addEventListener('change', function () { it.servManual = true; it.rateManual = false; applyRet(it); updRet(); });
+    ['.i-risr', '.i-riva'].forEach(function (c) { q(c).addEventListener('input', function () { this.value = this.value.replace(/[^0-9.]/g, ''); it.rateManual = true; chkRet(); recalc(); }); });
     q('.i-pu').addEventListener('blur', function () { if (this.value.trim()) this.value = r2(num(this.value)).toFixed(2); });
-    q('.item-remove').addEventListener('click', function () { if (state.items.length === 1) return; row.remove(); state.items = state.items.filter(function (x) { return x !== it; }); renumber(); recalc(); });
-    $('items-wrap').appendChild(row); state.items.push(it); renumber(); recalc();
+    q('.item-remove').addEventListener('click', function () { if (state.items.length === 1) return; row.remove(); state.items = state.items.filter(function (x) { return x !== it; }); renumber(); updRet(); });
+    $('items-wrap').appendChild(row); state.items.push(it); renumber(); autoServ(it); applyRet(it); updRet();
     return it;
   }
   function obraOpts() { return '<option value="">Misma del centro de costos</option>' + ccLista().map(function (o) { return '<option>' + esc(o) + '</option>'; }).join(''); }
@@ -447,34 +475,37 @@
   function itemsData() {
     return state.items.map(function (it) {
       var q = it.q;
-      return { obra: q('.i-obra').value || $('f-cc').value, cantidad: r2(num(q('.i-cant').value)), unidad: q('.i-unidad').value, descripcion: q('.i-desc').value.trim(), partida: q('.i-partida').value || '', precioUnitario: num(q('.i-pu').value), tasaIva: q('.i-iva').value };
+      return { obra: q('.i-obra').value || $('f-cc').value, cantidad: r2(num(q('.i-cant').value)), unidad: q('.i-unidad').value, descripcion: q('.i-desc').value.trim(), partida: q('.i-partida').value || '', precioUnitario: num(q('.i-pu').value), tasaIva: q('.i-iva').value, servicio: q('.i-serv').value, retIsrPct: itemRet(it).isr, retIvaPct: itemRet(it).iva };
     });
   }
   function ocData() {
     var p = provData() || {};
     var tipo = document.querySelector('input[name="tipo"]:checked');
-    return {
+    var o = {
       fecha: $('f-fecha').value, solicitante: $('f-solicitante').value.trim(), correoSolicitante: $('f-correo').value.trim().toLowerCase(),
       autoriza: $('f-autoriza').value.trim(), correoAutoriza: $('f-correo-aut').value.trim().toLowerCase(),
       empresa: $('f-empresa').value, cc: $('f-cc').value, frente: $('f-frente').value.trim(), estimacion: $('f-estim').value.trim() || 'NA',
       tipoOC: tipo ? tipo.value : 'NORMAL', reqFolio: normReq($('f-req').value),
       provNuevo: state.provMode === 'nuevo' ? 'SI' : 'NO', provNum: p.num || '', provNombre: p.nombre || '', provRfc: p.rfc || '', provRegimen: p.regimen || '', provBanco: p.banco || '',
       provClabe: state.provMode === 'nuevo' ? $('n-clabe').value : (p.clabe4 ? '00000000000000' + p.clabe4 : ''), provTelefono: $('n-tel').value.trim(), provCorreo: $('f-prov-correo').value.trim().toLowerCase(),
-      servicio: $('f-servicio').value, emiteFactura: state.emite, formaPago: $('f-forma').value, metodoPago: $('f-metodo').value, usoCfdi: $('f-uso').value,
+      servicio: '', emiteFactura: state.emite, formaPago: $('f-forma').value, metodoPago: $('f-metodo').value, usoCfdi: $('f-uso').value,
       diasCredito: +$('f-dias').value, fechaPagoEstimada: $('f-fecha').value ? O.addDays($('f-fecha').value, +$('f-dias').value) : '',
       moneda: $('f-moneda').value, tipoCambio: num($('f-tc').value) || 1,
       pctAnticipo: num($('p-anticipo').value) / 100, pctFondo: num($('p-fondo').value) / 100, pctOtras: num($('p-otras').value) / 100,
-      retIsrPct: state.emite === 'NO' ? 0 : retCaptured().isr, retIvaPct: state.emite === 'NO' ? 0 : retCaptured().iva, retSugIsr: ret.isr, retSugIva: ret.iva, retManual: chkRet() ? 'NO' : 'SI', items: itemsData(), observaciones: $('f-obs').value.trim()
+      retIsrPct: 0, retIvaPct: 0, retManual: (state.retManualPartidas || []).length ? 'SI' : 'NO', items: itemsData(), observaciones: $('f-obs').value.trim()
     };
+    var sv = {}; o.items.forEach(function (it) { sv[it.servicio || 'Generales'] = 1; }); o.servicio = Object.keys(sv).join(', ');
+    var tt = O.calcular(o); o.retIsrPct = tt.retIsrEf; o.retIvaPct = tt.retIvaEf;
+    return o;
   }
   function recalc() {
     if (!state.items.length) return;
     var oc = ocData(), t = O.calcular(oc), mon = oc.moneda;
-    state.items.forEach(function (it, i) { it.q('.i-sub').textContent = O.money(oc.items[i].subtotal, mon); });
+    state.items.forEach(function (it, i) { var x = oc.items[i]; it.q('.i-sub').textContent = O.money(x.subtotal, mon); var rr = (x.retIsr || 0) + (x.retIva || 0); it.q('.i-ret').textContent = rr ? '-' + O.money(rr, mon) : O.money(0, mon); it.q('.i-ret').classList.toggle('neg', !!rr); });
     var L = [['Importe', t.bruto]];
     if (t.amort) L.push(['Amort. anticipo', -t.amort]); if (t.fondo) L.push(['Fondo de garantía', -t.fondo]); if (t.otras) L.push(['Otras retenciones', -t.otras]);
     L.push(['Subtotal', t.subtotal], ['IVA', t.iva]);
-    if (t.retIsr) L.push(['Ret. ISR ' + O.pct(oc.retIsrPct), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.pct(oc.retIvaPct), -t.retIva]);
+    if (t.retIsr) L.push(['Ret. ISR ' + O.retEtiqueta(oc, 'isr'), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.retEtiqueta(oc, 'iva'), -t.retIva]);
     var html = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + O.money(Math.abs(x[1]), mon) + '</span></div>'; }).join('');
     html += '<div class="tot-line grand"><span>Total</span><span>' + O.money(t.total, mon) + '</span></div>';
     if (mon === 'DOLARES') html += '<div class="tot-line"><span>Equivalente M.N.</span><span>' + O.money(t.totalMXN) + '</span></div>';
@@ -597,7 +628,7 @@
       if (!it.partida) return err('Partida ' + (i + 1) + ': selecciona el insumo.', q('.i-partida'));
       if (!(it.precioUnitario > 0)) return err('Partida ' + (i + 1) + ': captura el precio unitario.', q('.i-pu'));
     }
-    var cr = retCaptured(); if (cr.isr > 0.35 || cr.iva > 0.16) return err('Revisa las retenciones: el ISR no puede pasar de 35 % ni el IVA de 16 %.', $('r-isr'));
+    for (var k = 0; k < oc.items.length; k++) { var ik = oc.items[k]; if (ik.retIsrPct > 0.35 || ik.retIvaPct > 0.16) return err('Partida ' + (k + 1) + ': revisa las retenciones (ISR máximo 35 %, IVA máximo 16 %).', state.items[k].q('.i-risr')); }
     var t = O.calcular(oc); if (t.total <= 0) return err('El total debe ser mayor a cero.');
     return true;
   }
@@ -606,7 +637,7 @@
     e.preventDefault();
     var oc = ocData(); if (!validate(oc)) return;
     oc.totalLetra = O.letras(O.calcular(oc).total, oc.moneda);
-    if (oc.retManual === 'SI') oc.observaciones = (oc.observaciones ? oc.observaciones + ' | ' : '') + 'RETENCIONES CAPTURADAS MANUALMENTE: ISR ' + O.pct(oc.retIsrPct) + ' / IVA ' + O.pct(oc.retIvaPct) + ' (el régimen sugiere ISR ' + O.pct(oc.retSugIsr) + ' / IVA ' + O.pct(oc.retSugIva) + ')';
+    if (oc.retManual === 'SI') oc.observaciones = (oc.observaciones ? oc.observaciones + ' | ' : '') + 'RETENCIONES CAPTURADAS MANUALMENTE EN PARTIDA ' + state.retManualPartidas.join(', ') + ' (distintas a las del régimen del proveedor)';
     var files = [state.files.CARATULA, state.files.CSF].filter(Boolean).filter(function () { return state.provMode === 'nuevo'; }).concat(state.files.COTIZACION);
     try { localStorage.setItem('gfm_oc_me', JSON.stringify({ solicitante: oc.solicitante, correo: oc.correoSolicitante, autoriza: oc.autoriza, 'correo-aut': oc.correoAutoriza })); } catch (x) {}
     $('overlay').hidden = false; $('submit-btn').disabled = true;

@@ -266,7 +266,7 @@
     var kv = function (arr) { return '<div class="kv">' + arr.map(function (x) { return '<div><span class="k">' + x[0] + '</span><span class="v">' + (x[2] ? x[1] : esc(x[1] || '—')) + '</span></div>'; }).join('') + '</div>'; };
     var adj = (r.adjuntos || []).map(function (a) { return '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(a.url) + '">' + esc(a.tipo || 'Archivo') + ': ' + esc(a.nombre) + '</a>'; }).join(' ');
     var L = [['Importe', t.bruto]]; if (t.amort) L.push(['Amort. anticipo', -t.amort]); if (t.fondo) L.push(['Fondo de garantía', -t.fondo]); if (t.otras) L.push(['Otras retenciones', -t.otras]);
-    L.push(['Subtotal', t.subtotal], ['IVA', t.iva]); if (t.retIsr) L.push(['Ret. ISR ' + O.pct(r.retIsrPct), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.pct(r.retIvaPct), -t.retIva]);
+    L.push(['Subtotal', t.subtotal], ['IVA', t.iva]); if (t.retIsr) L.push(['Ret. ISR ' + O.retEtiqueta(r, 'isr'), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.retEtiqueta(r, 'iva'), -t.retIva]);
     var tot = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + money(Math.abs(x[1]), mon) + '</span></div>'; }).join('') + '<div class="tot-line grand"><span>Total</span><span>' + money(t.total, mon) + '</span></div>';
     var clabe = String(r.provClabe || '').replace(/\D/g, '');
     $('d-body').innerHTML =

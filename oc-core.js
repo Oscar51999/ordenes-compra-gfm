@@ -109,6 +109,23 @@
     return out;
   }
 
+  // Tipo de servicio de una partida según su insumo / descripción (para retenciones por partida).
+  function servicioDeInsumo(insumo, desc) {
+    var t = (String(insumo || '') + ' ' + String(desc || '')).toUpperCase();
+    if (/HONORARIO/.test(t)) return 'Honorarios';
+    if (/FLETE|ACARREO/.test(t)) return 'Fletes';
+    if (/ARREND|\bRENTA\b|\bRENTAS\b/.test(t) && !/RENTA DE ACTIVO/.test(t)) return 'Arrendamiento';
+    return 'Generales';
+  }
+  function retPorPartida(oc) { return (oc.items || []).some(function (it) { return it.retIsrPct != null || it.retIvaPct != null; }); }
+  // Etiqueta del % de retención: si todas las partidas tienen la misma tasa se muestra, si no "por partida".
+  function retEtiqueta(oc, k) {
+    var key = k === 'isr' ? 'retIsrPct' : 'retIvaPct';
+    if (!retPorPartida(oc)) return pct(oc[key]);
+    var set = {}; (oc.items || []).forEach(function (it) { var v = num(it[key]); if (v) set[v.toFixed(6)] = v; });
+    var vals = Object.keys(set); return vals.length === 1 ? pct(set[vals[0]]) : 'por partida';
+  }
+
   // Cálculo de la orden (mismo orden que el Excel: las retenciones contractuales reducen el subtotal).
   function calcular(oc) {
     var items = oc.items || [];
@@ -129,11 +146,24 @@
     var factor = bruto ? subtotal / bruto : 0;
     var emite = oc.emiteFactura !== 'NO';
     var iva = emite ? r2(ivaBruto * factor) : 0;
-    var retIsr = emite ? r2(subtotal * num(oc.retIsrPct)) : 0;
-    var retIva = emite ? r2(baseIva * factor * num(oc.retIvaPct)) : 0;
+    var retIsr = 0, retIva = 0, isrRaw = 0, ivaRaw = 0;
+    if (emite && retPorPartida(oc)) {
+      items.forEach(function (it) {
+        var t = String(it.tasaIva == null ? '0.16' : it.tasaIva), gravado = t !== 'EXENTO' && num(t) > 0;
+        isrRaw += it.subtotal * factor * num(it.retIsrPct);
+        if (gravado) ivaRaw += it.subtotal * factor * num(it.retIvaPct);
+        it.retIsr = r2(it.subtotal * factor * num(it.retIsrPct)); it.retIva = gravado ? r2(it.subtotal * factor * num(it.retIvaPct)) : 0;
+      });
+      retIsr = r2(isrRaw); retIva = r2(ivaRaw);
+    } else if (emite) {
+      retIsr = r2(subtotal * num(oc.retIsrPct));
+      retIva = r2(baseIva * factor * num(oc.retIvaPct));
+    }
     var total = r2(subtotal + iva - retIsr - retIva);
     var tc = num(oc.tipoCambio) || 1;
-    return { bruto: bruto, amort: amort, fondo: fondo, otras: otras, subtotal: subtotal, iva: iva, retIsr: retIsr, retIva: retIva, total: total, totalMXN: r2(total * (oc.moneda === 'DOLARES' ? tc : 1)) };
+    return { bruto: bruto, amort: amort, fondo: fondo, otras: otras, subtotal: subtotal, iva: iva, retIsr: retIsr, retIva: retIva, total: total, totalMXN: r2(total * (oc.moneda === 'DOLARES' ? tc : 1)),
+      // tasas efectivas equivalentes (el backend recalcula con una sola tasa por orden)
+      retIsrEf: subtotal ? isrRaw / subtotal : 0, retIvaEf: baseIva && factor ? ivaRaw / (baseIva * factor) : 0 };
   }
 
   // Con factura: clasificaciones fiscales. Sin factura: las "NF" y las que no tienen versión NF (inventario, activos fijos).
@@ -229,7 +259,10 @@
 
       var body = (oc.items || []).map(function (it, i) {
         var tv = String(it.tasaIva == null ? '0.16' : it.tasaIva);
-        return [String(i + 1), it.obra || '', String(r2(num(it.cantidad))), it.unidad || '', it.descripcion || '', it.partida || '', tv === 'EXENTO' ? 'Exento' : (num(tv) * 100) + '%', money(it.precioUnitario, mon), money(num(it.cantidad) * num(it.precioUnitario), mon)];
+        var rt = [];
+        if (num(it.retIsrPct)) rt.push('ISR ' + pct(it.retIsrPct)); if (num(it.retIvaPct)) rt.push('IVA ' + pct(it.retIvaPct));
+        var ins = (it.partida || '') + (it.servicio && it.retIsrPct != null ? '\n' + it.servicio + (rt.length ? ' · Ret. ' + rt.join(' + ') : '') : '');
+        return [String(i + 1), it.obra || '', String(r2(num(it.cantidad))), it.unidad || '', it.descripcion || '', ins, tv === 'EXENTO' ? 'Exento' : (num(tv) * 100) + '%', money(it.precioUnitario, mon), money(num(it.cantidad) * num(it.precioUnitario), mon)];
       });
       doc.autoTable({
         startY: y, margin: { left: M, right: M }, theme: 'striped',
@@ -250,8 +283,8 @@
       if (t.otras) tot.push(['Otras retenciones (' + pct(oc.pctOtras) + ')', '-' + money(t.otras, mon)]);
       tot.push(['Subtotal', money(t.subtotal, mon)]);
       tot.push(['IVA', money(t.iva, mon)]);
-      if (t.retIsr) tot.push(['Ret. ISR (' + pct(oc.retIsrPct) + ')', '-' + money(t.retIsr, mon)]);
-      if (t.retIva) tot.push(['Ret. IVA (' + pct(oc.retIvaPct) + ')', '-' + money(t.retIva, mon)]);
+      if (t.retIsr) tot.push(['Ret. ISR (' + retEtiqueta(oc, 'isr') + ')', '-' + money(t.retIsr, mon)]);
+      if (t.retIva) tot.push(['Ret. IVA (' + retEtiqueta(oc, 'iva') + ')', '-' + money(t.retIva, mon)]);
       tot.push(['TOTAL', money(t.total, mon)]);
       if (mon === 'DOLARES') tot.push(['Equivalente M.N.', money(t.totalMXN)]);
       var startTot = y;
@@ -416,7 +449,7 @@
   global.OC = {
     CAT: CAT, EMPRESAS: EMPRESAS, ESTADOS: ESTADOS, ESTADO_LABEL: ESTADO_LABEL, LEYENDA: LEYENDA, FORMATO: FORMATO,
     num: num, r2: r2, money: money, pct: pct, fmtDate: fmtDate, addDays: addDays, todayISO: todayISO, esc: esc,
-    letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas,
+    letras: letras, regCode: regCode, esPersonaFisica: esPersonaFisica, retencionesSugeridas: retencionesSugeridas, servicioDeInsumo: servicioDeInsumo, retEtiqueta: retEtiqueta, retPorPartida: retPorPartida,
     calcular: calcular, maskClabe: maskClabe, ccDeEmpresa: ccDeEmpresa, obrasDeEmpresa: obrasDeEmpresa, insumosPara: insumosPara, leerCaratula: leerCaratula, buildPdf: buildPdf, ensurePdfLibs: ensurePdfLibs,
     leerDocumentoProveedor: leerDocumentoProveedor, parsePdfProveedor: parsePdfProveedor, parseXmlProveedor: parseXmlProveedor, regimenPorCodigo: regimenPorCodigo, BANCOS: BANCOS, clabeValid: clabeValid
   };
