@@ -92,7 +92,7 @@
     $('v-items').innerHTML = '<tr><th>Cant.</th><th>Descripción</th><th>Obra</th><th class="r">P.U.</th><th class="r">Subtotal</th></tr>' + (oc.items || []).map(function (it) { return '<tr><td>' + esc(it.cantidad) + ' ' + esc(it.unidad) + '</td><td class="wrap">' + esc(it.descripcion) + '</td><td class="wrap">' + esc(it.obra) + '</td><td class="r">' + O.money(it.precioUnitario, mon) + '</td><td class="r">' + O.money(O.num(it.cantidad) * O.num(it.precioUnitario), mon) + '</td></tr>'; }).join('');
     var L = [['Subtotal', t.subtotal], ['IVA', t.iva]]; if (t.retIsr) L.push(['Ret. ISR', -t.retIsr]); if (t.retIva) L.push(['Ret. IVA', -t.retIva]);
     $('v-tot').innerHTML = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + O.money(Math.abs(x[1]), mon) + '</span></div>'; }).join('') + '<div class="tot-line grand"><span>Total</span><span>' + O.money(t.total, mon) + '</span></div>';
-    $('v-obs').textContent = oc.observaciones ? 'Solicitud de recurso / motivo: ' + oc.observaciones : '';
+    $('v-obs').textContent = oc.observaciones ? 'Observaciones: ' + oc.observaciones : '';
     $('d-nombre').value = oc.autoriza || '';
     if (!pendiente) { $('decide').hidden = true; done(oc.estado, 'Esta orden ya fue atendida' + (oc.autorizadoPor ? ' por ' + oc.autorizadoPor : '') + '.'); }
   }

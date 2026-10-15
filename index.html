@@ -32,9 +32,10 @@
   .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .item-num { font-family: 'Roboto Mono', monospace; font-weight: 600; font-size: 12.5px; }
   .item-remove { font: inherit; font-size: 12px; font-weight: 600; color: var(--critical); background: transparent; border: none; cursor: pointer; padding: 4px 6px; }
-  .ig1 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+  .ig1 { display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; }
   .ig2 { display: grid; grid-template-columns: 90px 110px 1fr; gap: 10px; }
   .ig3 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
+  .i-ins-q { margin-bottom: 6px; padding-top: 8px !important; padding-bottom: 8px !important; font-size: 13.5px; }
   .ig4 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
   .ig4 .i-ret.neg { color: var(--critical, #b42318); }
   .ig4 input.manual { outline: 2px solid #e8a33d; }
@@ -211,7 +212,7 @@
     <h2 class="section-title"><span class="section-num">5</span>Resumen y envío</h2>
     <div class="totals">
       <div>
-        <div class="field"><label for="f-obs">Solicitud de recurso / motivo</label><textarea id="f-obs" placeholder="Para qué se compra, condiciones de entrega, lugar, vigencia de la cotización…" required></textarea></div>
+        <div class="field"><label for="f-obs">Observaciones</label><textarea id="f-obs" placeholder="Para qué se compra, condiciones de entrega, lugar, vigencia de la cotización…" required></textarea></div>
         <label class="drop" id="drop-cot"><input type="file" accept="application/pdf,image/*" multiple data-tipo="COTIZACION"><span class="ico">PDF</span><span class="txt"><strong>Cotización(es) del proveedor</strong><span>Opcional · PDF o foto</span></span></label>
         <div class="chips" id="cot-chips"></div>
       </div>
@@ -427,7 +428,7 @@
     row.innerHTML =
       '<div class="item-head"><span class="item-num"></span><button type="button" class="item-remove">Quitar</button></div>' +
       '<div class="ig1"><div class="field"><label>Obra</label><select class="i-obra">' + obraOpts() + '</select></div>' +
-      '<div class="field"><label>Insumo</label><select class="i-partida">' + insumoOpts() + '</select></div></div>' +
+      '<div class="field"><label>Insumo</label><input type="search" class="i-ins-q" placeholder="🔍 Buscar insumo por código o nombre" autocomplete="off"><select class="i-partida">' + insumoOpts() + '</select></div></div>' +
       '<div class="ig2"><div class="field"><label>Cantidad</label><input type="text" class="i-cant money" inputmode="decimal"></div>' +
       '<div class="field"><label>Unidad</label><select class="i-unidad">' + CAT.unidades.map(function (u) { return '<option>' + u + '</option>'; }).join('') + '</select></div>' +
       '<div class="field f-desc-wrap"><label>Descripción</label><input type="text" class="i-desc" placeholder="Ej. Concreto f\'c=350 kg/cm² TMA 20 mm"></div></div>' +
@@ -448,6 +449,8 @@
     if (pre.precioUnitario) q('.i-pu').value = r2(num(pre.precioUnitario)).toFixed(2);
     row.querySelectorAll('input,select').forEach(function (x) { x.addEventListener('input', recalc); x.addEventListener('change', recalc); });
     q('.i-partida').addEventListener('change', function () { autoServ(it); applyRet(it); updRet(); });
+    q('.i-ins-q').addEventListener('input', function () { filtrarInsumo(it); });
+    q('.i-ins-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); var s = q('.i-partida'); s.focus(); } });
     q('.i-desc').addEventListener('change', function () { autoServ(it); applyRet(it); updRet(); });
     q('.i-serv').addEventListener('change', function () { it.servManual = true; it.rateManual = false; applyRet(it); updRet(); });
     ['.i-risr', '.i-riva'].forEach(function (c) { q(c).addEventListener('input', function () { this.value = this.value.replace(/[^0-9.]/g, ''); it.rateManual = true; chkRet(); recalc(); }); });
@@ -457,15 +460,28 @@
     return it;
   }
   function obraOpts() { return '<option value="">Misma del centro de costos</option>' + ccLista().map(function (o) { return '<option>' + esc(o) + '</option>'; }).join(''); }
-  function insumoOpts() {
-    return '<option value="" disabled selected>Selecciona el insumo</option>' + O.insumosPara(state.emite).map(function (g) {
-      return '<optgroup label="' + esc(g.g) + '">' + g.i.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</optgroup>';
+  function normTxt(x) { return String(x || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function insumoOpts(filtro, keep) {
+    var words = normTxt(filtro).split(/\s+/).filter(Boolean), n = 0;
+    var html = O.insumosPara(state.emite).map(function (g) {
+      var gl = normTxt(g.g);
+      var its = g.i.filter(function (x) { var t = normTxt(x) + ' ' + gl, ok = words.every(function (w) { return t.indexOf(w) >= 0; }); if (ok) n++; return ok || x === keep; });
+      return its.length ? '<optgroup label="' + esc(g.g) + '">' + its.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</optgroup>' : '';
     }).join('');
+    var ph = words.length ? (n ? n + ' resultado' + (n === 1 ? '' : 's') + ' · selecciona el insumo' : 'Sin resultados para "' + esc(filtro) + '"') : 'Selecciona el insumo';
+    return '<option value="" disabled selected>' + ph + '</option>' + html;
+  }
+  function filtrarInsumo(it) {
+    var sel = it.q('.i-partida'), pv = sel.value, f = it.q('.i-ins-q').value.trim();
+    sel.innerHTML = insumoOpts(f, pv);
+    if (pv) { sel.value = pv; if (sel.value !== pv) sel.value = ''; }
+    var opts = sel.querySelectorAll('option:not([disabled])');
+    if (f && opts.length === 1 && sel.value !== opts[0].value) { sel.value = opts[0].value; sel.dispatchEvent(new Event('change')); }
   }
   function refreshItemSelects() {
     state.items.forEach(function (it) {
       var o = it.q('.i-obra'), ov = o.value; o.innerHTML = obraOpts(); if (ov && ccLista().indexOf(ov) >= 0) o.value = ov;
-      var p = it.q('.i-partida'), pv = p.value; p.innerHTML = insumoOpts(); if (pv) { p.value = pv; if (p.value !== pv) p.value = ''; }
+      var p = it.q('.i-partida'), pv = p.value; p.innerHTML = insumoOpts(it.q('.i-ins-q').value.trim()); if (pv) { p.value = pv; if (p.value !== pv) p.value = ''; }
     });
   }
   function renumber() { state.items.forEach(function (it, i) { it.q('.item-num').textContent = 'Partida ' + (i + 1); it.q('.item-remove').hidden = state.items.length === 1; }); $('add-item-btn').hidden = state.items.length >= MAX_ITEMS; }
@@ -609,7 +625,7 @@
     if (!oc.cc) return err('Selecciona el centro de costos.', $('f-cc'));
     var ccOk = O.ccDeEmpresa(oc.empresa); if (ccOk && ccOk.indexOf(oc.cc) < 0) return err('El centro de costos no corresponde a ' + oc.empresa + '.', $('f-cc'));
     if (!oc.frente) return err('Escribe el frente.', $('f-frente'));
-    if (!oc.observaciones) return err('Escribe la solicitud de recurso / motivo de la compra.', $('f-obs'));
+    if (!oc.observaciones) return err('Escribe las observaciones de la compra.', $('f-obs'));
     if (state.provMode === 'cat' && !state.prov) return err('Selecciona un proveedor del catálogo o da de alta uno nuevo.', $('f-prov'));
     if (state.provMode === 'nuevo') {
       if (!oc.provNombre) return err('Escribe el nombre del proveedor nuevo.', $('n-nombre'));

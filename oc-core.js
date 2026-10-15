@@ -313,7 +313,7 @@
       var endTot = doc.lastAutoTable.finalY;
       var lw = W - 2 * M - 236;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(7.6); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-      doc.text('SOLICITUD DE RECURSO / MOTIVO', M, startTot + 8);
+      doc.text('OBSERVACIONES', M, startTot + 8);
       doc.setFont('helvetica', 'normal'); doc.setTextColor(INK[0], INK[1], INK[2]);
       var obs = doc.splitTextToSize(oc.observaciones || '—', lw);
       doc.text(obs.slice(0, 7), M, startTot + 19);
