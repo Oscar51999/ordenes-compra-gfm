@@ -35,6 +35,10 @@
   .ig1 { display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; }
   .ig2 { display: grid; grid-template-columns: 90px 110px 1fr; gap: 10px; }
   .ig3 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; }
+  input.locked { background: color-mix(in srgb, var(--ink) 6%, var(--surface)); color: var(--ink-soft); cursor: not-allowed; }
+  .presu { float: right; font-weight: 600; font-size: 11.5px; color: var(--c1); text-decoration: underline; text-underline-offset: 2px; }
+  .edit-banner { border-left: 5px solid #B91C1C; }
+  .edit-banner .mot { border-left: 3px solid #C2410C; padding: 6px 10px; background: color-mix(in srgb, #C2410C 7%, var(--surface)); margin: 8px 0 0; }
   .i-ins-q { margin-bottom: 6px; padding-top: 8px !important; padding-bottom: 8px !important; font-size: 13.5px; }
   .ig4 { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; align-items: end; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
   .ig4 .i-ret.neg { color: var(--critical, #b42318); }
@@ -116,7 +120,7 @@
       <div class="field"><label for="f-cc">Centro de costos</label><select id="f-cc" required></select></div>
     </div>
     <div class="row3">
-      <div class="field"><label for="f-fecha">Fecha de la orden</label><input type="date" id="f-fecha" required></div>
+      <div class="field"><label for="f-fecha">Fecha de la orden</label><input type="date" id="f-fecha" required readonly tabindex="-1" class="locked" title="Se registra con la fecha de hoy"><p class="hint">Se registra automáticamente con la fecha de hoy.</p></div>
       <div class="field"><label for="f-frente">Frente</label><input type="text" id="f-frente" required></div>
       <div class="field"><label for="f-estim">No. de estimación <span class="opt">(opcional)</span></label><input type="text" id="f-estim" placeholder="NA"></div>
     </div>
@@ -212,8 +216,8 @@
     <h2 class="section-title"><span class="section-num">5</span>Resumen y envío</h2>
     <div class="totals">
       <div>
-        <div class="field"><label for="f-obs">Observaciones</label><textarea id="f-obs" placeholder="Para qué se compra, condiciones de entrega, lugar, vigencia de la cotización…" required></textarea></div>
-        <label class="drop" id="drop-cot"><input type="file" accept="application/pdf,image/*" multiple data-tipo="COTIZACION"><span class="ico">PDF</span><span class="txt"><strong>Cotización(es) del proveedor</strong><span>Opcional · PDF o foto</span></span></label>
+        <div class="field"><label for="f-obs">Observaciones</label><textarea id="f-obs" placeholder="Para qué se compra, condiciones de entrega, lugar…" required></textarea></div>
+        <label class="drop" id="drop-cot"><input type="file" accept="application/pdf,image/*" multiple data-tipo="FACTURA"><span class="ico">PDF</span><span class="txt"><strong>Factura del proveedor</strong><span>Obligatoria · PDF o foto</span></span></label>
         <div class="chips" id="cot-chips"></div>
       </div>
       <div>
@@ -224,7 +228,7 @@
     <p class="error-msg" id="error-msg"></p>
     <div class="submit-row">
       <button type="submit" class="primary" id="submit-btn">Enviar a autorización</button>
-      <span class="submit-note">Recibirás un correo con tu folio.</span>
+      <span class="submit-note" id="submit-note">Recibirás un correo con tu folio.</span>
     </div>
   </div>
 </form>
@@ -262,7 +266,7 @@
   function opts(sel, list, ph, map) {
     sel.innerHTML = (ph ? '<option value="" disabled selected>' + esc(ph) + '</option>' : '') + list.map(function (v) { var o = map ? map(v) : { v: v, l: v }; return '<option value="' + esc(o.v) + '">' + esc(o.l) + '</option>'; }).join('');
   }
-  var state = { prov: null, provMode: 'cat', emite: 'SI', proveedores: [], items: [], files: { CARATULA: null, CSF: null, COTIZACION: [] }, last: null };
+  var state = { prov: null, provMode: 'cat', emite: 'SI', proveedores: [], items: [], files: { CARATULA: null, CSF: null, FACTURA: [] }, last: null };
 
   // ---- catálogos ----
   opts($('f-empresa'), O.EMPRESAS.map(function (e) { return e.nombre; }), 'Selecciona la empresa');
@@ -274,6 +278,7 @@
   opts($('n-regimen'), CAT.regimenes, 'Selecciona');
   $('tipo-group').innerHTML = CAT.tiposOC.map(function (t, i) { return '<label class="pill"><input type="radio" name="tipo" value="' + t + '"' + (i ? '' : ' checked') + '><span class="dot"></span>' + t.charAt(0) + t.slice(1).toLowerCase() + '</label>'; }).join('');
   $('f-fecha').value = O.todayISO();
+  ['keydown', 'mousedown', 'click'].forEach(function (ev) { $('f-fecha').addEventListener(ev, function (e) { e.preventDefault(); }); });
   function ccLista() { var e = $('f-empresa').value; return e ? (O.ccDeEmpresa(e) || CAT.cc) : []; }
   function fillCc() {
     var lista = ccLista(), cur = $('f-cc').value;
@@ -289,8 +294,8 @@
   // ---- proveedores ----
   function provLabel(p) { return p.num + ' · ' + p.nombre + (p.rfc ? ' · ' + p.rfc : ''); }
   function loadProveedores() {
-    if (!APPS_SCRIPT_URL) { $('f-prov').placeholder = 'Catálogo no disponible: usa "Proveedor nuevo"'; return; }
-    fetch(APPS_SCRIPT_URL + '?action=proveedores').then(function (r) { return r.json(); }).then(function (d) {
+    if (!APPS_SCRIPT_URL) { $('f-prov').placeholder = 'Catálogo no disponible: usa "Proveedor nuevo"'; return Promise.resolve(); }
+    return fetch(APPS_SCRIPT_URL + '?action=proveedores').then(function (r) { return r.json(); }).then(function (d) {
       state.proveedores = (d.items || []).sort(function (a, b) { return a.nombre.localeCompare(b.nombre); });
       var frag = document.createDocumentFragment();
       state.proveedores.forEach(function (p) { var o = document.createElement('option'); o.value = provLabel(p); frag.appendChild(o); });
@@ -428,7 +433,7 @@
     row.innerHTML =
       '<div class="item-head"><span class="item-num"></span><button type="button" class="item-remove">Quitar</button></div>' +
       '<div class="ig1"><div class="field"><label>Obra</label><select class="i-obra">' + obraOpts() + '</select></div>' +
-      '<div class="field"><label>Insumo</label><input type="search" class="i-ins-q" placeholder="🔍 Buscar insumo por código o nombre" autocomplete="off"><select class="i-partida">' + insumoOpts() + '</select></div></div>' +
+      '<div class="field"><label>Insumo <a class="presu" href="http://firmemexico.sytes.net:8580/" target="_blank" rel="noopener">¿Cuentas con presupuesto? Consúltalo aquí ↗</a></label><input type="search" class="i-ins-q" placeholder="🔍 Buscar insumo por código o nombre" autocomplete="off"><select class="i-partida">' + insumoOpts() + '</select></div></div>' +
       '<div class="ig2"><div class="field"><label>Cantidad</label><input type="text" class="i-cant money" inputmode="decimal"></div>' +
       '<div class="field"><label>Unidad</label><select class="i-unidad">' + CAT.unidades.map(function (u) { return '<option>' + u + '</option>'; }).join('') + '</select></div>' +
       '<div class="field f-desc-wrap"><label>Descripción</label><input type="text" class="i-desc" placeholder="Ej. Concreto f\'c=350 kg/cm² TMA 20 mm"></div></div>' +
@@ -602,11 +607,11 @@
     var lab = $(id), tipo = lab.querySelector('input').dataset.tipo;
     bindDrop(lab, function (fs) { var e = prepFile(fs[0], tipo); if (!e) return; state.files[tipo] = e; lab.classList.add('has-file'); lab.classList.remove('invalid'); lab.querySelector('.txt span').textContent = e.nombre; if (tipo === 'CARATULA') autoBanco(fs[0], lab); });
   });
-  bindDrop($('drop-cot'), function (fs) { fs.slice(0, 5).forEach(function (f) { var e = prepFile(f, 'COTIZACION'); if (e) state.files.COTIZACION.push(e); }); renderChips(); });
+  bindDrop($('drop-cot'), function (fs) { fs.slice(0, 5).forEach(function (f) { var e = prepFile(f, 'FACTURA'); if (e) state.files.FACTURA.push(e); }); renderChips(); });
   function renderChips() {
     $('cot-chips').innerHTML = '';
-    state.files.COTIZACION.forEach(function (f, i) { var c = document.createElement('span'); c.className = 'chip'; c.innerHTML = '<span>' + esc(f.nombre) + '</span><button type="button" aria-label="Quitar">×</button>'; c.querySelector('button').onclick = function () { state.files.COTIZACION.splice(i, 1); renderChips(); }; $('cot-chips').appendChild(c); });
-    $('drop-cot').classList.toggle('has-file', state.files.COTIZACION.length > 0);
+    state.files.FACTURA.forEach(function (f, i) { var c = document.createElement('span'); c.className = 'chip'; c.innerHTML = '<span>' + esc(f.nombre) + '</span><button type="button" aria-label="Quitar">×</button>'; c.querySelector('button').onclick = function () { state.files.FACTURA.splice(i, 1); renderChips(); }; $('cot-chips').appendChild(c); });
+    $('drop-cot').classList.toggle('has-file', state.files.FACTURA.length > 0);
   }
 
   // ---- validación y envío ----
@@ -632,8 +637,8 @@
       if (oc.provRfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(oc.provRfc)) return err('El RFC del proveedor no es válido.', $('n-rfc'));
       if (state.emite === 'SI' && !oc.provRfc) return err('Si el proveedor factura, captura su RFC.', $('n-rfc'));
       if (!oc.provRegimen) return err('Selecciona el régimen fiscal del proveedor.', $('n-regimen'));
-      if (!clabeValid(oc.provClabe || '')) return err('Captura la CLABE del proveedor (18 dígitos válidos).', $('n-clabe'));
-      if (!state.files.CARATULA) { $('drop-caratula').classList.add('invalid'); return err('Sube la carátula bancaria del proveedor.', $('drop-caratula')); }
+      if (!clabeValid(oc.provClabe || '') && !(state.edit && state.edit.prevNuevo && !oc.provClabe)) return err('Captura la CLABE del proveedor (18 dígitos válidos).', $('n-clabe'));
+      if (!state.files.CARATULA && !(state.edit && state.edit.prevNuevo)) { $('drop-caratula').classList.add('invalid'); return err('Sube la carátula bancaria del proveedor.', $('drop-caratula')); }
     }
     if (oc.provCorreo && !emailRe.test(oc.provCorreo)) return err('El correo del proveedor no es válido.', $('f-prov-correo'));
     if (oc.moneda === 'DOLARES' && oc.tipoCambio <= 1) return err('Captura el tipo de cambio.', $('f-tc'));
@@ -645,6 +650,7 @@
       if (!(it.precioUnitario > 0)) return err('Partida ' + (i + 1) + ': captura el precio unitario.', q('.i-pu'));
     }
     for (var k = 0; k < oc.items.length; k++) { var ik = oc.items[k]; if (ik.retIsrPct > 0.35 || ik.retIvaPct > 0.16) return err('Partida ' + (k + 1) + ': revisa las retenciones (ISR máximo 35 %, IVA máximo 16 %).', state.items[k].q('.i-risr')); }
+    if (!state.files.FACTURA.length && !(state.edit && state.edit.tieneFactura)) { $('drop-cot').classList.add('invalid'); return err('Adjunta la factura del proveedor (PDF o foto).', $('drop-cot')); }
     var t = O.calcular(oc); if (t.total <= 0) return err('El total debe ser mayor a cero.');
     return true;
   }
@@ -654,13 +660,13 @@
     var oc = ocData(); if (!validate(oc)) return;
     oc.totalLetra = O.letras(O.calcular(oc).total, oc.moneda);
     if (oc.retManual === 'SI') oc.observaciones = (oc.observaciones ? oc.observaciones + ' | ' : '') + 'RETENCIONES CAPTURADAS MANUALMENTE EN PARTIDA ' + state.retManualPartidas.join(', ') + ' (distintas a las del régimen del proveedor)';
-    var files = [state.files.CARATULA, state.files.CSF].filter(Boolean).filter(function () { return state.provMode === 'nuevo'; }).concat(state.files.COTIZACION);
+    var files = [state.files.CARATULA, state.files.CSF].filter(Boolean).filter(function () { return state.provMode === 'nuevo'; }).concat(state.files.FACTURA);
     try { localStorage.setItem('gfm_oc_me', JSON.stringify({ solicitante: oc.solicitante, correo: oc.correoSolicitante, autoriza: oc.autoriza, 'correo-aut': oc.correoAutoriza })); } catch (x) {}
     $('overlay').hidden = false; $('submit-btn').disabled = true;
     Promise.all(files.map(function (f) { return f.ready; })).then(function () {
       if (!APPS_SCRIPT_URL) throw new Error('El formulario aún no está conectado al servidor.');
       var sendOc = Object.assign({}, oc); if (state.provMode !== 'nuevo') delete sendOc.provClabe;
-      return fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ accion: 'crear', oc: sendOc, archivos: files.map(function (f) { return { nombre: f.nombre, tipo: f.tipo, data: f.data }; }) }) }).then(function (r) { return r.json(); });
+      return fetch(APPS_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ accion: state.edit ? 'reenviar' : 'crear', folio: state.edit ? state.edit.folio : undefined, t: state.edit ? state.edit.t : undefined, oc: sendOc, archivos: files.map(function (f) { return { nombre: f.nombre, tipo: f.tipo, data: f.data }; }) }) }).then(function (r) { return r.json(); });
     }).then(function (d) {
       if (!d || !d.ok) throw new Error(d && d.error || 'El servidor no respondió.');
       oc.folio = d.folio; oc.estado = 'por_autorizar'; if (d.provNum) oc.provNum = d.provNum;
@@ -672,7 +678,8 @@
   function showConfirm(oc) {
     $('oc-form').hidden = true; $('confirm-view').hidden = false; window.scrollTo(0, 0);
     $('confirm-id').textContent = oc.folio;
-    $('confirm-text').innerHTML = 'Tu orden por <b>' + O.money(O.calcular(oc).total, oc.moneda) + '</b> a <b>' + esc(oc.provNombre) + '</b> se envió a <b>' + esc(oc.autoriza) + '</b> para su autorización. Te llegará un correo cuando la autorice o rechace.';
+    if (state.edit) { document.querySelector('#confirm-view .ok-pill').textContent = 'Orden corregida y reenviada'; }
+    $('confirm-text').innerHTML = (state.edit ? 'Corregiste la orden. ' : '') + 'Tu orden por <b>' + O.money(O.calcular(oc).total, oc.moneda) + '</b> a <b>' + esc(oc.provNombre) + '</b> se envió a <b>' + esc(oc.autoriza) + '</b> para su autorización. Te llegará un correo cuando la autorice o rechace.';
   }
   $('dl-pdf').addEventListener('click', function () {
     var b = this; b.disabled = true; $('pdf-status').textContent = 'Generando PDF…';
@@ -681,7 +688,82 @@
   });
   $('reset-link').addEventListener('click', function (e) { e.preventDefault(); location.reload(); });
 
-  addItem(); updRet(); loadProveedores();
+  var provsReady = loadProveedores() || Promise.resolve();
+  addItem(); updRet();
+
+  // ---- corregir una orden rechazada (liga del correo de rechazo) ----
+  (function () {
+    var qs = new URLSearchParams(location.search), folio = qs.get('editar'), tok = qs.get('t');
+    if (!folio || !tok || !APPS_SCRIPT_URL) return;
+    $('overlay-text').textContent = 'Cargando la orden ' + folio + '…'; $('overlay').hidden = false;
+    var banner = document.createElement('div'); banner.className = 'card edit-banner'; banner.id = 'edit-banner';
+    var form = $('oc-form'); form.insertBefore(banner, form.firstElementChild);
+    fetch(APPS_SCRIPT_URL + '?action=editar&folio=' + encodeURIComponent(folio) + '&t=' + encodeURIComponent(tok)).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.ok) {
+        banner.innerHTML = '<h2 class="section-title">No se puede corregir ' + esc(folio) + '</h2><p>' + esc(d && d.error || 'No se encontró la orden.') + '</p><p><a href="./">Levantar una orden nueva</a></p>';
+        form.querySelectorAll('.card:not(#edit-banner)').forEach(function (c) { c.hidden = true; });
+        return;
+      }
+      return provsReady.then(function () { cargarEdicion(d.oc, tok); });
+    }).catch(function () { banner.innerHTML = '<h2 class="section-title">No se pudo cargar la orden</h2><p>Revisa tu conexión y vuelve a abrir la liga del correo.</p>'; })
+      .then(function () { $('overlay').hidden = true; $('overlay-text').textContent = 'Enviando orden…'; });
+  })();
+
+  function cargarEdicion(oc, tok) {
+    var adj = oc.adjuntos || [];
+    var facturas = adj.filter(function (a) { return a.tipo === 'FACTURA'; });
+    state.edit = { folio: oc.folio, t: tok, prevNuevo: oc.provNuevo === 'SI', tieneFactura: facturas.length > 0 };
+    var motivo = oc.comentarioAutorizacion || oc.comentarioAdmin || '';
+    var quien = oc.autorizadoPor || oc.autoriza || '';
+    $('edit-banner').innerHTML = '<h2 class="section-title">Corrigiendo la orden ' + esc(oc.folio) + '</h2>' +
+      '<p style="margin:0">Fue <b>rechazada</b>' + (quien ? ' por <b>' + esc(quien) + '</b>' : '') + '. Corrige lo necesario y presiona <b>Reenviar a autorización</b>; se conserva el mismo folio.</p>' +
+      (motivo ? '<p class="mot"><b>Motivo del rechazo:</b> ' + esc(motivo) + '</p>' : '');
+    function setv(id, v) { if ($(id) && v != null) $(id).value = v; }
+    setv('f-req', oc.reqFolio && oc.reqFolio !== 'N/A' ? oc.reqFolio : '');
+    setv('f-solicitante', oc.solicitante); setv('f-correo', oc.correoSolicitante); setv('f-autoriza', oc.autoriza); setv('f-correo-aut', oc.correoAutoriza);
+    if (O.EMPRESAS.some(function (e) { return e.nombre === oc.empresa; })) { $('f-empresa').value = oc.empresa; fillCc(); if (ccLista().indexOf(oc.cc) >= 0) $('f-cc').value = oc.cc; }
+    setv('f-frente', oc.frente); setv('f-estim', oc.estimacion && oc.estimacion !== 'NA' ? oc.estimacion : '');
+    var tr = document.querySelector('input[name="tipo"][value="' + (oc.tipoOC || 'NORMAL') + '"]'); if (tr) tr.checked = true;
+    var eb = $('emite-seg').querySelector('button[data-v="' + (oc.emiteFactura === 'NO' ? 'NO' : 'SI') + '"]'); if (eb) eb.click();
+    if (oc.provNuevo === 'SI') {
+      $('prov-mode').querySelector('button[data-v="nuevo"]').click();
+      setv('n-nombre', oc.provNombre); setv('n-rfc', oc.provRfc); $('n-rfc').dispatchEvent(new Event('input'));
+      if (oc.provRegimen) { setv('n-regimen', oc.provRegimen); }
+      setv('n-banco', oc.provBanco); setv('n-tel', oc.provTelefono);
+      if (oc.provClabe) { $('n-clabe-hint').textContent = 'Ya registrada: ' + oc.provClabe + '. Déjala vacía para conservarla o captura una nueva.'; $('n-clabe-hint').className = 'hint ok'; }
+      $('drop-caratula').querySelector('.txt span').textContent = 'Ya enviada; súbela solo si cambió la cuenta';
+    } else {
+      var p = state.proveedores.filter(function (x) { return String(x.num) === String(oc.provNum); })[0];
+      $('f-prov').value = p ? provLabel(p) : (oc.provNombre || ''); pickProv();
+    }
+    setv('f-prov-correo', oc.provCorreo);
+    ['f-forma', 'f-metodo', 'f-uso'].forEach(function (id, i) { var v = [oc.formaPago, oc.metodoPago, oc.usoCfdi][i]; if (v && Array.prototype.some.call($(id).options, function (o) { return o.value === v; })) $(id).value = v; });
+    if (oc.diasCredito != null && Array.prototype.some.call($('f-dias').options, function (o) { return o.value === String(oc.diasCredito); })) $('f-dias').value = String(oc.diasCredito);
+    if (oc.moneda) { $('f-moneda').value = oc.moneda; $('f-moneda').dispatchEvent(new Event('change')); if (oc.moneda === 'DOLARES') setv('f-tc', oc.tipoCambio); }
+    var pcts = { 'p-anticipo': oc.pctAnticipo, 'p-fondo': oc.pctFondo, 'p-otras': oc.pctOtras }, anyPct = false;
+    Object.keys(pcts).forEach(function (id) { var v = num(pcts[id]); if (v) { $(id).value = fmtPct(v); anyPct = true; } });
+    if (anyPct && $('contract')) $('contract').open = true;
+    // partidas
+    state.items.forEach(function (it) { it.row.remove(); }); state.items = [];
+    (oc.items || []).forEach(function (it) {
+      var x = addItem({ obra: it.obra && it.obra !== oc.cc ? it.obra : '', cantidad: it.cantidad, unidad: it.unidad, descripcion: it.descripcion, partida: it.partida, precioUnitario: it.precioUnitario });
+      if (!x) return;
+      if (it.tasaIva != null) x.q('.i-iva').value = String(it.tasaIva);
+      if (it.servicio) { x.q('.i-serv').value = it.servicio; x.servManual = true; }
+      applyRet(x);
+      if (it.retIsrPct != null && x.sug && (Math.abs(num(it.retIsrPct) - x.sug.isr) > 0.00005 || Math.abs(num(it.retIvaPct) - x.sug.iva) > 0.00005)) {
+        x.q('.i-risr').value = fmtPct(it.retIsrPct); x.q('.i-riva').value = fmtPct(it.retIvaPct); x.rateManual = true;
+      }
+    });
+    if (!state.items.length) addItem();
+    setv('f-obs', String(oc.observaciones || '').replace(/\s*\|\s*RETENCIONES CAPTURADAS MANUALMENTE[\s\S]*$/, ''));
+    if (facturas.length) { $('drop-cot').classList.add('has-file'); $('drop-cot').querySelector('.txt span').textContent = 'Ya adjunta: ' + facturas.map(function (a) { return a.nombre.replace(/^FACTURA_/, ''); }).join(', ') + ' · puedes agregar otra'; }
+    $('submit-btn').textContent = 'Reenviar a autorización';
+    $('submit-note').textContent = 'Se conserva el folio ' + oc.folio + '. Le llegará de nuevo a ' + (oc.autoriza || 'tu jefe') + '.';
+    document.title = 'Corregir ' + oc.folio;
+    updPago(); updRet(); recalc();
+    window.scrollTo(0, 0);
+  }
   window.__oc = { state: state, ocData: ocData, addItem: addItem };
 })();
 </script>
