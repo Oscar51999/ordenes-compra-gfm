@@ -29,6 +29,11 @@
   .filters input, .filters select { background: var(--surface); padding: 9px 10px; font-size: 13px; }
   .list .tbl table { font-size: 12.5px; }
   .list tr.row { cursor: pointer; }
+  .docs { display: grid; gap: 6px; }
+  .doc { display: grid; grid-template-columns: 150px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+  .doc .dt { font-weight: 700; font-size: 12.5px; color: var(--c1); }
+  .doc .dn { font-size: 13px; word-break: break-all; }
+  @media (max-width: 600px) { .doc { grid-template-columns: 1fr auto; } .doc .dt { grid-column: 1 / -1; } }
   .list .c { text-align: center; white-space: nowrap; }
   .list tr.row:hover td { background: color-mix(in srgb, var(--c1) 7%, var(--surface)); }
   .flag { font-size: 10.5px; font-weight: 600; color: var(--critical); margin-left: 6px; }
@@ -72,8 +77,6 @@
   .modal .card { width: min(480px, 100%); margin: 0; }
   .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #431407; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 60; box-shadow: var(--shadow); }
 </style>
-<meta name="author" content="Oscar Cota Latorre">
-<meta name="copyright" content="© 2026 Oscar Cota Latorre">
 </head>
 <body>
 <div class="topbar">
@@ -266,6 +269,23 @@
     busy(true, 'Generando PDF…');
     O.buildPdf(r, { clabeCompleta: true }).then(function (doc) { doc.save(r.folio + '_FO-GF-02.pdf'); }).catch(function () { toast('No se pudo generar el PDF'); }).then(function () { busy(false); });
   }
+  var DOC_LABEL = { FACTURA: 'Factura', COTIZACION: 'Cotización', CARATULA: 'Carátula bancaria', CSF: 'Constancia fiscal', CFDI: 'CFDI', PDF: 'PDF enviado al proveedor', ARCHIVO: 'Archivo' };
+  function docsDe(r) {
+    var idre = /\/d\/([-\w]{20,})|[?&]id=([-\w]{20,})/;
+    var l = (r.adjuntos || []).map(function (a) { return { nombre: a.nombre, tipo: a.tipo || 'ARCHIVO', url: a.url }; });
+    if (r.pdfUrl) l.push({ nombre: r.folio + '_FO-GF-02.pdf', tipo: 'PDF', url: r.pdfUrl });
+    return l.filter(function (d) { return idre.test(String(d.url || '')); });
+  }
+  function descargarDoc(r, doc) {
+    busy(true, doc === 'zip' ? 'Preparando ZIP con todos los documentos…' : 'Descargando documento…');
+    post({ accion: 'descargar', folio: r.folio, doc: doc }).then(function (d) {
+      if (!d || !d.ok) throw new Error(d && d.error || 'Sin respuesta');
+      var bin = atob(d.data), bytes = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([bytes], { type: d.mime || 'application/octet-stream' }));
+      var a = document.createElement('a'); a.href = url; a.download = d.nombre || 'documento'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    }).catch(function (x) { toast('No se pudo descargar: ' + (x.message || x)); }).then(function () { busy(false); });
+  }
   function filtered() {
     var q = $('f-q').value.trim().toLowerCase(), est = $('f-estado').value, emp = $('f-empresa').value, al = $('f-alerta').value;
     var kf = KPIS.filter(function (k) { return k.id === kpiFilter; })[0];
@@ -289,7 +309,11 @@
     $('d-folio').textContent = r.folio; $('d-badge').innerHTML = badge(r.estado);
     var t = O.calcular(JSON.parse(JSON.stringify(r))), mon = r.moneda;
     var kv = function (arr) { return '<div class="kv">' + arr.map(function (x) { return '<div><span class="k">' + x[0] + '</span><span class="v">' + (x[2] ? x[1] : esc(x[1] || '—')) + '</span></div>'; }).join('') + '</div>'; };
-    var adj = (r.adjuntos || []).map(function (a) { return '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(a.url) + '">' + esc(a.tipo || 'Archivo') + ': ' + esc(a.nombre) + '</a>'; }).join(' ');
+    var docs = docsDe(r);
+    var docsHtml = '<div class="card"><p class="section-title" style="font-size:16px">Documentos (' + docs.length + ')</p>' +
+      (docs.length ? '<div class="docs">' + docs.map(function (d, i) { return '<div class="doc"><span class="dt">' + esc(DOC_LABEL[d.tipo] || d.tipo) + '</span><span class="dn">' + esc(String(d.nombre).replace(/^(FACTURA|COTIZACION|CARATULA|CSF|CFDI)_/, '')) + '</span><button class="btn ghost sm doc-dl" type="button" data-i="' + i + '">⬇ Descargar</button></div>'; }).join('') + '</div>' +
+        (docs.length > 1 ? '<p style="margin:10px 0 0"><button class="btn sm" id="doc-zip" type="button">⬇ Descargar todos (ZIP)</button></p>' : '')
+        : '<p class="hint" style="margin:0">Esta orden no tiene documentos adjuntos.</p>') + '</div>';
     var L = [['Importe', t.bruto]]; if (t.amort) L.push(['Amort. anticipo', -t.amort]); if (t.fondo) L.push(['Fondo de garantía', -t.fondo]); if (t.otras) L.push(['Otras retenciones', -t.otras]);
     L.push(['Subtotal', t.subtotal], ['IVA', t.iva]); if (t.retIsr) L.push(['Ret. ISR ' + O.retEtiqueta(r, 'isr'), -t.retIsr]); if (t.retIva) L.push(['Ret. IVA ' + O.retEtiqueta(r, 'iva'), -t.retIva]);
     var tot = L.map(function (x) { return '<div class="tot-line' + (x[1] < 0 ? ' neg' : '') + '"><span>' + x[0] + '</span><span>' + (x[1] < 0 ? '-' : '') + money(Math.abs(x[1]), mon) + '</span></div>'; }).join('') + '<div class="tot-line grand"><span>Total</span><span>' + money(t.total, mon) + '</span></div>';
@@ -303,8 +327,7 @@
         (['autorizada', 'enviada'].indexOf(r.estado) >= 0 ? '<button class="btn ok sm" id="a-send" type="button">✉ ' + (r.estado === 'enviada' ? 'Reenviar' : 'Enviar') + ' al proveedor</button>' : '') +
         (r.estado === 'por_autorizar' ? '<button class="btn ghost sm" id="a-remind" type="button">Recordar a ' + esc(r.autoriza) + '</button>' : '') +
         (r.carpetaUrl ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(r.carpetaUrl) + '">Carpeta Drive</a>' : '') +
-        (r.pdfUrl ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(r.pdfUrl) + '">PDF enviado</a>' : '') +
-      '</div>' + (adj ? '<div class="acts" style="margin-top:10px">' + adj + '</div>' : '') + '</div>' +
+      '</div></div>' + docsHtml +
       '<div class="card"><p class="section-title" style="font-size:16px">Orden</p>' + kv([
         ['Fecha', O.fmtDate(r.fecha)], ['Tipo', r.tipoOC], ['Requisición', r.reqFolio || 'N/A'],
         ['Solicita', r.solicitante + ' · ' + r.correoSolicitante], ['Autoriza', r.autoriza + ' · ' + r.correoAutoriza], ['Autorizó', r.autorizadoPor ? r.autorizadoPor + ' · ' + r.fechaAutorizacion : '—'],
@@ -329,6 +352,8 @@
       '<div class="card"><p class="section-title" style="font-size:16px">Historial</p><ul class="hist">' + (r.historial || []).slice().reverse().map(function (h) { return '<li><span class="when">' + esc(h.f ? new Date(h.f).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '') + '</span> · ' + badge(h.e) + ' · <b>' + esc(h.u) + '</b>' + (h.c ? '<br>' + esc(h.c) : '') + '</li>'; }).join('') + '</ul></div>';
 
     $('a-pdf').onclick = function () { descargarPdf(r); };
+    Array.prototype.forEach.call($('d-body').querySelectorAll('.doc-dl'), function (b) { b.onclick = function () { descargarDoc(r, +b.dataset.i); }; });
+    if ($('doc-zip')) $('doc-zip').onclick = function () { descargarDoc(r, 'zip'); };
     if ($('a-send')) $('a-send').onclick = function () { $('s-to').value = r.provCorreo || ''; $('s-msg').value = ''; $('s-err').classList.remove('show'); $('send-modal').hidden = false; $('s-to').focus(); };
     if ($('a-remind')) $('a-remind').onclick = function () { busy(true, 'Enviando recordatorio…'); post({ accion: 'reenviarAutorizacion', folio: r.folio }).then(function (d) { toast(d.ok ? 'Recordatorio enviado a ' + r.correoAutoriza : d.error); }).catch(function () { toast('Error de conexión'); }).then(function () { busy(false); }); };
     $('e-save').onclick = function () {
@@ -496,8 +521,5 @@
   };
 })();
 </script>
-
-<!-- © 2026 Oscar Cota Latorre. Todos los derechos reservados. -->
-<div id="ocl-c" aria-hidden="true" style="position:fixed;right:4px;bottom:1px;z-index:2147483647;font:6px/1 Arial,sans-serif;letter-spacing:.2px;color:#8a8a8a;opacity:.3;pointer-events:none;user-select:none;-webkit-user-select:none;white-space:nowrap">© 2026 Oscar Cota Latorre</div>
 </body>
 </html>
