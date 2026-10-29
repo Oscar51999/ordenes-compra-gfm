@@ -116,6 +116,8 @@
       <select id="f-estado"><option value="">Todos los estados</option></select>
       <select id="f-empresa"><option value="">Todas las empresas</option></select>
       <select id="f-alerta"><option value="">Sin filtro de alertas</option><option value="vencidas">Pago vencido</option><option value="nuevo">Proveedor nuevo por validar</option><option value="sinclabe">Sin CLABE</option></select>
+      <select id="f-mes" aria-label="Filtrar por mes"></select>
+      <select id="f-semana" aria-label="Filtrar por semana"></select>
     </div>
     <div class="list"><div class="tbl"><table id="tbl"></table></div><p class="empty" id="empty" hidden>No hay órdenes con estos filtros.</p></div>
   </div>
@@ -255,6 +257,7 @@
   function render() {
     $('kpis').innerHTML = KPIS.map(function (k) { var rs = all.filter(k.f); var m = rs.reduce(function (a, r) { return a + totMXN(r); }, 0); return '<button type="button" class="kpi' + (kpiFilter === k.id ? ' on' : '') + '" data-k="' + k.id + '"><div class="l">' + k.l + '</div><div class="n">' + rs.length + '</div><div class="s">' + money(m) + '</div></button>'; }).join('');
     Array.prototype.forEach.call($('kpis').querySelectorAll('.kpi'), function (b) { b.onclick = function () { kpiFilter = kpiFilter === b.dataset.k ? '' : b.dataset.k; render(); }; });
+    PeriodoFiltro.update(all.map(fechaOC));
     var rows = filtered();
     $('empty').hidden = rows.length > 0;
     $('tbl').innerHTML = '<tr><th>Folio</th><th>Fecha</th><th>Estado</th><th>Proveedor</th><th>Solicita</th><th>Centro de costos</th><th class="r">Total</th><th>Pago aprox.</th><th class="c">PDF</th></tr>' + rows.map(function (r) {
@@ -286,6 +289,82 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
     }).catch(function (x) { toast('No se pudo descargar: ' + (x.message || x)); }).then(function () { busy(false); });
   }
+  // ---- Filtros por Mes y por Semana (fecha de la solicitud) ----
+  var PeriodoFiltro = (function () {
+    var MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    var MES3 = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    var mesEl = null, semEl = null, onChange = function () {}, sigMes = '', sigSem = '';
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function toDate(v) {
+      if (v === null || v === undefined || v === '') return null;
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+      if (typeof v === 'number') { var dn = new Date(v); return isNaN(dn.getTime()) ? null : dn; }
+      var s = String(v).trim(), m;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { m = s.split('-'); return new Date(+m[0], +m[1] - 1, +m[2]); }
+      if (s.indexOf('T') > 0) { var dt = new Date(s); return isNaN(dt.getTime()) ? null : dt; }
+      m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+      var d2 = new Date(s);
+      return isNaN(d2.getTime()) ? null : d2;
+    }
+    function mesKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+    function lunes(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+    function semKey(d) { var l = lunes(d); return l.getFullYear() + '-' + pad(l.getMonth() + 1) + '-' + pad(l.getDate()); }
+    function mesLabel(k) { var p = k.split('-'); return MES[+p[1] - 1] + ' ' + p[0]; }
+    function semLabel(k) {
+      var p = k.split('-'), a = new Date(+p[0], +p[1] - 1, +p[2]), b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 6);
+      return a.getDate() + ' ' + MES3[a.getMonth()] + ' – ' + b.getDate() + ' ' + MES3[b.getMonth()] + ' ' + b.getFullYear();
+    }
+    function fill(el, first, items, current) {
+      var keep = '';
+      el.innerHTML = '';
+      var o0 = document.createElement('option'); o0.value = ''; o0.textContent = first; el.appendChild(o0);
+      items.forEach(function (it) {
+        var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; el.appendChild(o);
+        if (it[0] === current) keep = current;
+      });
+      el.value = keep;
+    }
+    function update(list) {
+      if (!mesEl || !semEl) return;
+      var meses = {}, semanas = {}, selMes = mesEl.value;
+      (list || []).forEach(function (v) {
+        var d = toDate(v); if (!d) return;
+        meses[mesKey(d)] = 1;
+        if (!selMes || mesKey(d) === selMes) semanas[semKey(d)] = 1;
+      });
+      var mk = Object.keys(meses).sort().reverse();
+      var sMes = mk.join('|');
+      if (sMes !== sigMes) { sigMes = sMes; fill(mesEl, 'Todos los meses', mk.map(function (k) { return [k, mesLabel(k)]; }), mesEl.value); }
+      var sk = Object.keys(semanas).sort().reverse();
+      var sSem = (mesEl.value || '*') + '#' + sk.join('|');
+      if (sSem !== sigSem) { sigSem = sSem; fill(semEl, 'Todas las semanas', sk.map(function (k) { return [k, 'Semana ' + semLabel(k)]; }), semEl.value); }
+    }
+    function init(mEl, sEl, cb) {
+      mesEl = mEl; semEl = sEl; onChange = cb || onChange;
+      fill(mesEl, 'Todos los meses', [], ''); fill(semEl, 'Todas las semanas', [], '');
+      mesEl.addEventListener('change', function () { sigSem = ''; semEl.value = ''; onChange(); });
+      semEl.addEventListener('change', function () { onChange(); });
+    }
+    function match(v) {
+      if (!mesEl || (!mesEl.value && !semEl.value)) return true;
+      var d = toDate(v); if (!d) return false;
+      if (mesEl.value && mesKey(d) !== mesEl.value) return false;
+      if (semEl.value && semKey(d) !== semEl.value) return false;
+      return true;
+    }
+    function describe() {
+      var out = [];
+      if (mesEl && mesEl.value) out.push('Mes: ' + mesLabel(mesEl.value));
+      if (semEl && semEl.value) out.push('Semana: ' + semLabel(semEl.value));
+      return out;
+    }
+    return { init: init, update: update, match: match, describe: describe, toDate: toDate };
+  })();
+
+  PeriodoFiltro.init($('f-mes'), $('f-semana'), function () { render(); });
+  function fechaOC(r) { return String(r.fecha || '').slice(0, 10); }
+
   function filtered() {
     var q = $('f-q').value.trim().toLowerCase(), est = $('f-estado').value, emp = $('f-empresa').value, al = $('f-alerta').value;
     var kf = KPIS.filter(function (k) { return k.id === kpiFilter; })[0];
@@ -293,6 +372,7 @@
       if (kf && !kf.f(r)) return false;
       if (est && r.estado !== est) return false;
       if (emp && r.empresa !== emp) return false;
+      if (!PeriodoFiltro.match(fechaOC(r))) return false;
       if (al === 'vencidas' && !vencida(r)) return false;
       if (al === 'nuevo' && !nuevoPend(r)) return false;
       if (al === 'sinclabe' && !sinClabe(r)) return false;
