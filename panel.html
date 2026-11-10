@@ -9,8 +9,8 @@
 <meta name="theme-color" content="#431407">
 <link rel="stylesheet" href="oc.css">
 <style>
-  main { max-width: 1180px; }
-  .topbar-inner { max-width: 1180px; }
+  main { max-width: min(1600px, calc(100vw - 32px)); }
+  .topbar-inner { max-width: min(1600px, calc(100vw - 32px)); }
   .gate { max-width: 380px; margin: 40px auto; }
   .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .conn { font-size: 12px; color: var(--ink-soft); }
@@ -34,7 +34,16 @@
   .doc .dt { font-weight: 700; font-size: 12.5px; color: var(--c1); }
   .doc .dn { font-size: 13px; word-break: break-all; }
   @media (max-width: 600px) { .doc { grid-template-columns: 1fr auto; } .doc .dt { grid-column: 1 / -1; } }
-  .list td.com { min-width: 150px; max-width: 240px; white-space: normal; font-size: 12px; line-height: 1.35; }
+  .p-res { margin-top: 4px; max-height: 260px; overflow: auto; border: 1px solid var(--line, #ddd); border-radius: 10px; background: var(--card, #fff); }
+  .p-res button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line, #eee); background: none; font: inherit; font-size: 13px; cursor: pointer; }
+  .p-res button:hover, .p-res button:focus { background: rgba(0,0,0,.05); }
+  /* La lista cabe completa sin scroll horizontal: las columnas de texto se parten en renglones. */
+  .list .tbl th, .list .tbl td { white-space: normal; padding: 7px 7px; overflow-wrap: anywhere; }
+  .list .tbl th { overflow-wrap: normal; }
+  .list .tbl td.wrap { min-width: 0; }
+  .list .tbl td.r, .list .tbl th.r, .list .tbl td.mono { white-space: nowrap; overflow-wrap: normal; }
+  .list .tbl .btn { white-space: nowrap; }
+  .list td.com { min-width: 110px; max-width: 220px; white-space: normal; font-size: 12px; line-height: 1.35; }
   .list .c { text-align: center; white-space: nowrap; }
   .list tr.row:hover td { background: color-mix(in srgb, var(--c1) 7%, var(--surface)); }
   .flag { font-size: 10.5px; font-weight: 600; color: var(--critical); margin-left: 6px; }
@@ -145,7 +154,7 @@
   <div class="card wide">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 class="section-title" style="margin:0" id="p-title">Alta de proveedor</h2><button class="btn ghost sm" id="p-close" type="button">Cerrar ✕</button></div>
     <div id="p-pick" hidden style="margin-top:10px">
-      <div class="field"><label for="p-buscar">Proveedor a modificar</label><input type="search" id="p-buscar" list="dl-pprov" placeholder="Escribe número, nombre o RFC y elige de la lista" autocomplete="off"><datalist id="dl-pprov"></datalist><p class="hint" id="p-buscar-hint">Los cambios aplican a las órdenes nuevas; las órdenes ya capturadas no cambian.</p></div>
+      <div class="field"><label for="p-buscar">Proveedor a modificar</label><input type="search" id="p-buscar" placeholder="Escribe número, nombre o RFC" autocomplete="off"><div id="p-res" class="p-res" hidden></div><p class="hint" id="p-buscar-hint">Los cambios aplican a las órdenes nuevas; las órdenes ya capturadas no cambian.</p></div>
     </div>
     <p class="section-hint" style="margin-top:6px">Sube el CFDI (XML o PDF) o la constancia de situación fiscal para llenar los datos, o captúralos a mano.</p>
     <label class="drop" id="p-drop"><input type="file" id="p-file" accept=".xml,.pdf,application/pdf,text/xml,application/xml"><span class="ico">XML<br>PDF</span><span class="txt"><strong>Llenar con CFDI o constancia fiscal</strong><span id="p-file-txt">Toca o arrastra el XML o PDF</span></span></label>
@@ -540,7 +549,7 @@
   var pEdit = null; // proveedor que se está modificando
   function provEtiqueta(p) { return p.num + ' · ' + p.nombre + (p.rfc ? ' · ' + p.rfc : ''); }
   function modoAlta(edit) {
-    pEdit = null; $('p-pick').hidden = !edit; $('p-buscar').value = '';
+    pEdit = null; $('p-pick').hidden = !edit; $('p-buscar').value = ''; $('p-res').hidden = true; $('p-buscar-hint').textContent = 'Los cambios aplican a las órdenes nuevas; las órdenes ya capturadas no cambian.'; $('p-buscar-hint').className = 'hint';
     $('p-title').textContent = edit ? 'Modificar proveedor' : 'Alta de proveedor';
     $('p-save').textContent = edit ? 'Guardar cambios' : 'Guardar proveedor';
     $('p-car').querySelector('.txt strong').textContent = edit ? 'Carátula bancaria' : 'Carátula bancaria *';
@@ -549,21 +558,29 @@
   $('b-prov').onclick = function () { pReset(); modoAlta(false); $('prov-modal').hidden = false; };
   $('b-prov-edit').onclick = function () {
     pReset(); modoAlta(true);
-    $('dl-pprov').innerHTML = provs.map(function (p) { return '<option value="' + esc(provEtiqueta(p)) + '">'; }).join('');
     $('prov-modal').hidden = false; $('p-buscar').focus();
   };
-  $('p-buscar').addEventListener('change', function () {
-    var v = this.value.trim(), num = v.split('·')[0].trim();
-    var p = provs.filter(function (x) { return String(x.num) === num; })[0];
-    if (!p) { $('p-buscar-hint').textContent = 'Elige un proveedor de la lista.'; $('p-buscar-hint').className = 'hint bad'; return; }
-    pReset(); pEdit = p; this.value = provEtiqueta(p);
+  function normP(t) { return String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  var pRes = [];
+  $('p-buscar').addEventListener('input', function () {
+    var q = normP(this.value.trim()), box = $('p-res');
+    if (q.length < 2 && !/^\d+$/.test(q)) { box.hidden = true; return; }
+    pRes = provs.filter(function (x) { return String(x.num) === q || normP(x.nombre).indexOf(q) >= 0 || normP(x.rfc).indexOf(q) >= 0; }).slice(0, 30);
+    box.innerHTML = pRes.length ? pRes.map(function (x, i) { return '<button type="button" data-i="' + i + '"><b>#' + esc(x.num) + '</b> ' + esc(x.nombre) + (x.rfc ? ' <span class="hint" style="margin:0">' + esc(x.rfc) + '</span>' : '') + '</button>'; }).join('') : '<div class="hint" style="padding:8px 10px;margin:0">Sin coincidencias</div>';
+    box.hidden = false;
+  });
+  $('p-buscar').addEventListener('keydown', function (e) { if (e.key === 'Enter' && pRes.length) { e.preventDefault(); elegirProv(pRes[0]); } });
+  $('p-res').addEventListener('click', function (e) { var b = e.target.closest('button[data-i]'); if (b) elegirProv(pRes[+b.dataset.i]); });
+  function elegirProv(p) {
+    $('p-res').hidden = true;
+    pReset(); pEdit = p; $('p-buscar').value = provEtiqueta(p);
     $('p-buscar-hint').textContent = 'Modificando el proveedor #' + p.num + '. Los cambios aplican a las órdenes nuevas.'; $('p-buscar-hint').className = 'hint ok';
     $('p-nombre').value = p.nombre || ''; $('p-rfc').value = p.rfc || ''; $('p-regimen').value = p.regimen || ''; $('p-cp').value = p.cp || '';
     $('p-tel').value = p.telefono || ''; $('p-banco').value = p.banco || ''; $('p-correo').value = p.correo || ''; $('p-obs').value = p.obs || '';
     $('p-clabe').value = p.clabe || ''; if (p.clabe) $('p-clabe').dispatchEvent(new Event('input'));
     rfcCheck();
     $('p-car').querySelector('.txt span').textContent = 'Opcional · súbela si cambió la cuenta';
-  });
+  }
   $('p-close').onclick = function () { $('prov-modal').hidden = true; };
   function rfcCheck() {
     var v = $('p-rfc').value = $('p-rfc').value.toUpperCase().replace(/[^A-ZÑ&0-9]/g, '');
