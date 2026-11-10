@@ -291,6 +291,18 @@
   }
   $('f-empresa').addEventListener('change', fillCc);
   fillCc();
+  // CC agregados desde el panel
+  if (APPS_SCRIPT_URL) {
+    fetch(APPS_SCRIPT_URL + '?action=ccExtra').then(function (r) { return r.json(); }).then(function (d) {
+      var ex = (d && d.ok && d.items) || {}, n = 0;
+      Object.keys(ex).forEach(function (emp) {
+        var l = CAT.ccPorEmpresa[emp] = CAT.ccPorEmpresa[emp] || [];
+        ex[emp].forEach(function (cc) { if (l.indexOf(cc) < 0) { l.push(cc); n++; } if (CAT.cc.indexOf(cc) < 0) CAT.cc.push(cc); });
+        l.sort(function (a, b) { return a.localeCompare(b, 'es', { numeric: true }); });
+      });
+      if (n) fillCc();
+    }).catch(function () {});
+  }
   try { var me = JSON.parse(localStorage.getItem('gfm_oc_me') || '{}'); ['solicitante', 'correo', 'autoriza', 'correo-aut'].forEach(function (k) { if (me[k]) $('f-' + k).value = me[k]; }); } catch (e) {}
 
   // ---- proveedores ----
