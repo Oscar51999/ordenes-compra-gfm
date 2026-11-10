@@ -130,6 +130,7 @@
       <select id="f-alerta"><option value="">Sin filtro de alertas</option><option value="vencidas">Pago vencido</option><option value="nuevo">Proveedor nuevo por validar</option><option value="sinclabe">Sin CLABE</option></select>
       <select id="f-mes" aria-label="Filtrar por mes"></select>
       <select id="f-semana" aria-label="Filtrar por semana"></select>
+      <input type="search" id="f-com" list="dl-com" placeholder="Filtrar por comentario…" aria-label="Filtrar por comentario" autocomplete="off"><datalist id="dl-com"></datalist>
     </div>
     <div class="list"><div class="tbl"><table id="tbl"></table></div><p class="empty" id="empty" hidden>No hay órdenes con estos filtros.</p></div>
   </div>
@@ -270,7 +271,7 @@
     { id: 'vencidas', l: 'Pago vencido', f: vencida }
   ];
   function render() {
-    llenarFiltroCc();
+    llenarFiltroCc(); llenarFiltroCom();
     $('kpis').innerHTML = KPIS.map(function (k) { var rs = all.filter(k.f); var m = rs.reduce(function (a, r) { return a + totMXN(r); }, 0); return '<button type="button" class="kpi' + (kpiFilter === k.id ? ' on' : '') + '" data-k="' + k.id + '"><div class="l">' + k.l + '</div><div class="n">' + rs.length + '</div><div class="s">' + money(m) + '</div></button>'; }).join('');
     Array.prototype.forEach.call($('kpis').querySelectorAll('.kpi'), function (b) { b.onclick = function () { kpiFilter = kpiFilter === b.dataset.k ? '' : b.dataset.k; render(); }; });
     PeriodoFiltro.update(all.map(fechaOC));
@@ -401,11 +402,19 @@
       if (al === 'vencidas' && !vencida(r)) return false;
       if (al === 'nuevo' && !nuevoPend(r)) return false;
       if (al === 'sinclabe' && !sinClabe(r)) return false;
-      if (q) { var hay = [r.folio, r.reqFolio, r.provNombre, r.provRfc, r.provNum, r.solicitante, r.autoriza, r.cc, r.facturaRef].concat((r.items || []).map(function (i) { return i.descripcion; })).join(' ').toLowerCase(); if (hay.indexOf(q) < 0) return false; }
+      var fc = $('f-com').value.trim().toLowerCase();
+      if (fc) { var tc = textoComentario(r).toLowerCase(); if (fc === 'con comentario' ? !tc : fc === 'sin comentario' ? tc : tc.indexOf(fc) < 0) return false; }
+      if (q) { var hay = [textoComentario(r), r.folio, r.reqFolio, r.provNombre, r.provRfc, r.provNum, r.solicitante, r.autoriza, r.cc, r.facturaRef].concat((r.items || []).map(function (i) { return i.descripcion; })).join(' ').toLowerCase(); if (hay.indexOf(q) < 0) return false; }
       return true;
     });
   }
-  ['f-q', 'f-estado', 'f-empresa', 'f-cc', 'f-alerta'].forEach(function (id) { $(id).addEventListener('input', render); });
+  function textoComentario(r) { return [r.comentarioAdmin, r.comentarioAutorizacion].filter(Boolean).join(' ').trim(); }
+  function llenarFiltroCom() {
+    var vistos = {}, ops = ['Con comentario', 'Sin comentario'];
+    all.forEach(function (r) { var c = String(r.comentarioAdmin || r.comentarioAutorizacion || '').trim(); var k = c.toUpperCase(); if (c && !vistos[k] && c.length <= 80) { vistos[k] = 1; ops.push(c); } });
+    $('dl-com').innerHTML = ops.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
+  }
+  ['f-q', 'f-estado', 'f-empresa', 'f-cc', 'f-alerta', 'f-com'].forEach(function (id) { $(id).addEventListener('input', render); });
   // Filtro por centro de costos: lista los CC que tienen órdenes (de la empresa elegida, si hay una).
   var ccFiltroKey = '';
   function llenarFiltroCc() {
