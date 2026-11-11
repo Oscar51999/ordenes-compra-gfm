@@ -43,6 +43,10 @@
   .list .tbl td.wrap { min-width: 0; }
   .list .tbl td.r, .list .tbl th.r, .list .tbl td.mono { white-space: nowrap; overflow-wrap: normal; }
   .list .tbl .btn { white-space: nowrap; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab { font: inherit; font-weight: 700; font-size: 14px; background: none; border: none; border-bottom: 3px solid transparent; padding: 10px 14px; cursor: pointer; color: var(--ink-soft); margin-bottom: -1px; white-space: nowrap; }
+  .tab:hover { color: var(--ink); }
+  .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
   .list td.com { min-width: 110px; max-width: 220px; white-space: normal; font-size: 12px; line-height: 1.35; }
   .list .c { text-align: center; white-space: nowrap; }
   .list tr.row:hover td { background: color-mix(in srgb, var(--c1) 7%, var(--surface)); }
@@ -116,12 +120,15 @@
         <button class="btn ghost sm" id="b-logout" type="button">Salir</button>
         <button class="btn ghost sm" id="b-refresh" type="button">↻ Actualizar</button>
         <button class="btn ghost sm" id="b-xlsx" type="button">⬇ Exportar Excel</button>
-        <button class="btn ghost sm" id="b-prov" type="button">＋ Alta de proveedor</button>
-        <button class="btn ghost sm" id="b-prov-edit" type="button">✎ Modificar proveedor</button>
-        <button class="btn ghost sm" id="b-cc" type="button">＋ Centros de costo</button>
         <a class="btn sm" href="index.html" target="_blank" rel="noopener">+ Nueva orden</a>
       </div>
     </div>
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab on" data-v="ord" role="tab">Órdenes de compra</button>
+      <button type="button" class="tab" data-v="prov" role="tab">Proveedores</button>
+      <button type="button" class="tab" data-v="cc" role="tab">Centros de costo</button>
+    </div>
+    <section id="v-ord">
     <div class="kpis" id="kpis"></div>
     <div class="filters">
       <input type="search" id="f-q" placeholder="Buscar folio, proveedor, solicitante, REQ…">
@@ -131,8 +138,34 @@
       <select id="f-alerta"><option value="">Sin filtro de alertas</option><option value="vencidas">Pago vencido</option><option value="nuevo">Proveedor nuevo por validar</option><option value="sinclabe">Sin CLABE</option></select>
       <select id="f-mes" aria-label="Filtrar por mes"></select>
       <select id="f-semana" aria-label="Filtrar por semana"></select>
+      <input type="search" id="f-com" list="dl-com" placeholder="Filtrar por comentario…" aria-label="Filtrar por comentario" autocomplete="off"><datalist id="dl-com"></datalist>
     </div>
     <div class="list"><div class="tbl"><table id="tbl"></table></div><p class="empty" id="empty" hidden>No hay órdenes con estos filtros.</p></div>
+    </section>
+    <section id="v-prov" hidden>
+      <div class="filters" style="grid-template-columns:1fr auto">
+        <input type="search" id="pv-q" placeholder="Buscar proveedor por número, nombre, RFC, banco o correo…" aria-label="Buscar proveedor">
+        <button class="btn sm" id="b-prov" type="button">＋ Alta de proveedor</button>
+      </div>
+      <p class="hint" id="pv-count" style="margin:0 0 6px"></p>
+      <div class="list"><div class="tbl"><table id="pv-tbl"></table></div><p class="empty" id="pv-empty" hidden>No hay proveedores con esa búsqueda.</p></div>
+    </section>
+    <section id="v-cc" hidden>
+      <div class="card wide" style="max-width:860px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 class="section-title" style="margin:0">Centros de costo</h2></div>
+    <p class="section-hint" style="margin-top:6px">Agrega un centro de costos a una empresa. Aparece al instante en el formulario de órdenes de compra.</p>
+    <div class="row3">
+      <div class="field"><label for="cc-f-emp">Empresa</label><select id="cc-f-emp"></select></div>
+      <div class="field"><label for="cc-f-clave">Clave</label><input type="text" id="cc-f-clave" class="mono" maxlength="15" placeholder="148"></div>
+      <div class="field"><label for="cc-f-nom">Nombre del centro de costos</label><input type="text" id="cc-f-nom" maxlength="120"></div>
+    </div>
+    <p class="error-msg" id="cc-err"></p>
+    <div class="acts" style="margin-bottom:16px"><button class="btn" id="cc-save" type="button">Guardar CC</button></div>
+    <div class="field" style="margin-bottom:8px"><label for="cc-q">Centros de costo de la empresa</label><input type="search" id="cc-q" placeholder="Buscar por clave o nombre"></div>
+    <p class="hint" id="cc-count" style="margin:0 0 6px"></p>
+    <div class="tbl" style="max-height:340px;overflow-y:auto"><table><thead><tr><th>Centro de costos</th><th></th></tr></thead><tbody id="cc-list"></tbody></table></div>
+      </div>
+    </section>
   </div>
 </main>
 
@@ -184,22 +217,6 @@
   </div>
 </div>
 
-<div class="modal" id="cc-modal" hidden>
-  <div class="card wide">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 class="section-title" style="margin:0">Centros de costo</h2><button class="btn ghost sm" id="cc-close" type="button">Cerrar ✕</button></div>
-    <p class="section-hint" style="margin-top:6px">Agrega un centro de costos a una empresa. Aparece al instante en el formulario de órdenes de compra.</p>
-    <div class="row3">
-      <div class="field"><label for="cc-f-emp">Empresa</label><select id="cc-f-emp"></select></div>
-      <div class="field"><label for="cc-f-clave">Clave</label><input type="text" id="cc-f-clave" class="mono" maxlength="15" placeholder="148"></div>
-      <div class="field"><label for="cc-f-nom">Nombre del centro de costos</label><input type="text" id="cc-f-nom" maxlength="120"></div>
-    </div>
-    <p class="error-msg" id="cc-err"></p>
-    <div class="acts" style="margin-bottom:16px"><button class="btn" id="cc-save" type="button">Guardar CC</button></div>
-    <div class="field" style="margin-bottom:8px"><label for="cc-q">Centros de costo de la empresa</label><input type="search" id="cc-q" placeholder="Buscar por clave o nombre"></div>
-    <p class="hint" id="cc-count" style="margin:0 0 6px"></p>
-    <div class="tbl" style="max-height:340px;overflow-y:auto"><table><thead><tr><th>Centro de costos</th><th></th></tr></thead><tbody id="cc-list"></tbody></table></div>
-  </div>
-</div>
 
 <div class="modal" id="send-modal" hidden>
   <div class="card">
@@ -267,7 +284,7 @@
       provs = d.proveedores || [];
       all = (d.items || []).sort(function (a, b) { return String(b.folio).localeCompare(String(a.folio)); });
       $('conn').textContent = 'Conectado · ' + all.length + ' órdenes · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-      render();
+      render(); if (vista === 'prov') renderProvs();
       if (current) { var c = all.filter(function (x) { return x.folio === current.folio; })[0]; if (c && c.updatedAt !== current.updatedAt) openDetail(c); }
     }).catch(function () { $('conn').textContent = 'Sin conexión con el servidor'; });
   }
@@ -288,7 +305,7 @@
     { id: 'vencidas', l: 'Pago vencido', f: vencida }
   ];
   function render() {
-    llenarFiltroCc();
+    llenarFiltroCc(); llenarFiltroCom();
     $('kpis').innerHTML = KPIS.map(function (k) { var rs = all.filter(k.f); var m = rs.reduce(function (a, r) { return a + totMXN(r); }, 0); return '<button type="button" class="kpi' + (kpiFilter === k.id ? ' on' : '') + '" data-k="' + k.id + '"><div class="l">' + k.l + '</div><div class="n">' + rs.length + '</div><div class="s">' + money(m) + '</div></button>'; }).join('');
     Array.prototype.forEach.call($('kpis').querySelectorAll('.kpi'), function (b) { b.onclick = function () { kpiFilter = kpiFilter === b.dataset.k ? '' : b.dataset.k; render(); }; });
     PeriodoFiltro.update(all.map(fechaOC));
@@ -419,11 +436,19 @@
       if (al === 'vencidas' && !vencida(r)) return false;
       if (al === 'nuevo' && !nuevoPend(r)) return false;
       if (al === 'sinclabe' && !sinClabe(r)) return false;
-      if (q) { var hay = [r.folio, r.reqFolio, r.provNombre, r.provRfc, r.provNum, r.solicitante, r.autoriza, r.cc, r.facturaRef].concat((r.items || []).map(function (i) { return i.descripcion; })).join(' ').toLowerCase(); if (hay.indexOf(q) < 0) return false; }
+      var fc = $('f-com').value.trim().toLowerCase();
+      if (fc) { var tc = textoComentario(r).toLowerCase(); if (fc === 'con comentario' ? !tc : fc === 'sin comentario' ? tc : tc.indexOf(fc) < 0) return false; }
+      if (q) { var hay = [textoComentario(r), r.folio, r.reqFolio, r.provNombre, r.provRfc, r.provNum, r.solicitante, r.autoriza, r.cc, r.facturaRef].concat((r.items || []).map(function (i) { return i.descripcion; })).join(' ').toLowerCase(); if (hay.indexOf(q) < 0) return false; }
       return true;
     });
   }
-  ['f-q', 'f-estado', 'f-empresa', 'f-cc', 'f-alerta'].forEach(function (id) { $(id).addEventListener('input', render); });
+  function textoComentario(r) { return [r.comentarioAdmin, r.comentarioAutorizacion].filter(Boolean).join(' ').trim(); }
+  function llenarFiltroCom() {
+    var vistos = {}, ops = ['Con comentario', 'Sin comentario'];
+    all.forEach(function (r) { var c = String(r.comentarioAdmin || r.comentarioAutorizacion || '').trim(); var k = c.toUpperCase(); if (c && !vistos[k] && c.length <= 80) { vistos[k] = 1; ops.push(c); } });
+    $('dl-com').innerHTML = ops.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
+  }
+  ['f-q', 'f-estado', 'f-empresa', 'f-cc', 'f-alerta', 'f-com'].forEach(function (id) { $(id).addEventListener('input', render); });
   // Filtro por centro de costos: lista los CC que tienen órdenes (de la empresa elegida, si hay una).
   var ccFiltroKey = '';
   function llenarFiltroCc() {
@@ -539,7 +564,7 @@
   };
   function closeDetail() { $('drawer').hidden = $('drawer-bg').hidden = true; current = null; }
   $('d-close').onclick = closeDetail; $('drawer-bg').onclick = closeDetail;
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('cc-modal').hidden) $('cc-modal').hidden = true; else if (!$('send-modal').hidden) $('send-modal').hidden = true; else if (!$('prov-modal').hidden) $('prov-modal').hidden = true; else closeDetail(); } });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!$('send-modal').hidden) $('send-modal').hidden = true; else if (!$('prov-modal').hidden) $('prov-modal').hidden = true; else closeDetail(); } });
 
   $('s-cancel').onclick = function () { $('send-modal').hidden = true; };
   $('s-go').onclick = function () {
@@ -597,8 +622,6 @@
         .catch(function () { b.disabled = false; toast('No se pudo quitar el CC.'); });
     }; });
   }
-  $('b-cc').onclick = function () { ccErr(''); $('cc-f-clave').value = ''; $('cc-f-nom').value = ''; $('cc-q').value = ''; $('cc-modal').hidden = false; ccLoad(); };
-  $('cc-close').onclick = function () { $('cc-modal').hidden = true; };
   $('cc-f-emp').addEventListener('change', ccRender);
   $('cc-q').addEventListener('input', ccRender);
   $('cc-save').onclick = function () {
@@ -614,11 +637,34 @@
       $('cc-f-clave').value = ''; $('cc-f-nom').value = ''; toast('CC agregado: ' + d.cc + '. Ya aparece en el formulario.'); return ccLoad();
     }).catch(function () { ccErr('No se pudo conectar con el servidor.'); }).then(function () { $('cc-save').disabled = false; });
   };
+  // ---------- menú de pestañas ----------
+  var vista = 'ord';
+  function verVista(v) {
+    vista = v;
+    document.querySelectorAll('.tabs .tab').forEach(function (t) { var on = t.dataset.v === v; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); });
+    ['ord', 'prov', 'cc'].forEach(function (k) { $('v-' + k).hidden = k !== v; });
+    $('b-xlsx').hidden = v !== 'ord';
+    if (v === 'prov') renderProvs();
+    if (v === 'cc') { ccErr(''); ccLoad(); }
+  }
+  document.querySelectorAll('.tabs .tab').forEach(function (t) { t.addEventListener('click', function () { verVista(t.dataset.v); }); });
+  function renderProvs() {
+    var q = normP($('pv-q').value.trim());
+    var rows = provs.filter(function (x) { return !q || String(x.num) === q || [x.nombre, x.rfc, x.banco, x.correo].some(function (c) { return normP(c).indexOf(q) >= 0; }); })
+      .sort(function (a, b) { return (+b.num || 0) - (+a.num || 0); });
+    $('pv-count').textContent = provs.length + ' proveedores en el catálogo' + (q ? ' · ' + rows.length + ' coinciden' : '');
+    var vis = rows.slice(0, 300);
+    $('pv-tbl').innerHTML = '<thead><tr><th>#</th><th>Proveedor</th><th>RFC</th><th>Banco</th><th>CLABE</th><th>Correo</th><th></th></tr></thead><tbody>' +
+      vis.map(function (x, i) {
+        var cl = String(x.clabe || '');
+        return '<tr><td class="mono">' + esc(x.num) + '</td><td class="wrap">' + esc(x.nombre) + '</td><td class="mono">' + esc(x.rfc || '—') + '</td><td>' + esc(x.banco || '—') + '</td><td class="mono">' + (cl ? '•••• ' + esc(cl.slice(-4)) : '<span class="hint" style="margin:0">Sin CLABE</span>') + '</td><td class="wrap">' + esc(x.correo || '—') + '</td><td class="c"><button class="btn ghost sm pv-ed" data-i="' + i + '" type="button">✎ Modificar</button></td></tr>';
+      }).join('') + '</tbody>';
+    $('pv-empty').hidden = rows.length > 0;
+    if (rows.length > vis.length) $('pv-count').textContent += ' · se muestran los primeros ' + vis.length + ', usa la búsqueda';
+    $('pv-tbl').querySelectorAll('.pv-ed').forEach(function (b) { b.onclick = function () { pReset(); modoAlta(true); $('prov-modal').hidden = false; elegirProv(vis[+b.dataset.i]); }; });
+  }
+  $('pv-q').addEventListener('input', renderProvs);
   $('b-prov').onclick = function () { pReset(); modoAlta(false); $('prov-modal').hidden = false; };
-  $('b-prov-edit').onclick = function () {
-    pReset(); modoAlta(true);
-    $('prov-modal').hidden = false; $('p-buscar').focus();
-  };
   function normP(t) { return String(t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
   var pRes = [];
   $('p-buscar').addEventListener('input', function () {
